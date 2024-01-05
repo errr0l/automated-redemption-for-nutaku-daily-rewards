@@ -1,0 +1,6 @@
+.venv
+build
+dist
+cookies.json
+main.spec
+.DS_Store

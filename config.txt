@@ -3,6 +3,10 @@
 email=err0l@qq.com
 password=Xi12321@cm
 
+# 代理（梯子）
+[network]
+proxy=127.0.0.1:7890
+
 # 其他设置
 [settings]
 # 邮箱通知；以当前账号为准（on=启用，off=关闭）

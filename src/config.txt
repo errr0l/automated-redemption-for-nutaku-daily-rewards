@@ -13,5 +13,7 @@ proxy=127.0.0.1:7890
 email_notification=on
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
 retrying=10
-# 重试间隔（单位，小时）
-retrying_interval=1
+# 重试间隔（单位，分钟）
+retrying_interval=10
+# 执行时间（以24小时制为准，00:00-23:59）
+execution_time=09:00

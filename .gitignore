@@ -1,7 +1,7 @@
 .venv
 build
 dist
-cookies.json
+src/cookies.json
 main.spec
 .DS_Store
 .idea

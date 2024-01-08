@@ -28,4 +28,14 @@ retrying=10
 retrying_interval=5
 ```
 
+## 打包
+
+pyinstaller并非跨平台，需要在对应的系统上执行，如，在mac上只能打包为mac的可执行文件。
+
+> pyinstaller -w -F src/main.py
+
+## 导出配置
+
+> pip3 list --format=freeze >requirement.txt
+
 *本程序不会收集任何与账号有关的信息，但会给账号邮箱发送消息（如果已开启了通知的话）。*

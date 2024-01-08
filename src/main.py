@@ -35,6 +35,7 @@ def get_calendar_id(html):
         return rewards_calendar_ele.attrs['data-calendar-id']
 
 
+# 获取网站主页
 def get_nutaku_home(cookies, proxies):
     url = "https://www.nutaku.net/home/"
     cookies['isIpad'] = 'false'
@@ -141,7 +142,6 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
         elif respData['status'] == 'error':
             print('---> 账号或密码错误，请重新输入后再启动程序.')
             sys.exit()
-
     except JSONDecodeError:
         raise RuntimeError(fail_message2 + err_message)
 

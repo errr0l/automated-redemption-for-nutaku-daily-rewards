@@ -5,7 +5,8 @@ import sys
 import requests
 import configparser
 import urllib.parse
-from apscheduler.events import EVENT_JOB_ERROR
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED, EVENT_SCHEDULER_RESUMED, \
+    EVENT_SCHEDULER_SHUTDOWN
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from json import JSONDecodeError
@@ -85,12 +86,10 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
     user_gold = reward_resp_data['userGold']
     print("---> 当前金币为：" + user_gold + "\n")
     data_file_path = config.get('sys', 'dir') + '/data.json'
-    data = {}
+    data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d')}
+
     with open(data_file_path, 'w') as _file:
         json.dump(data, _file)
-        data['user_gold'] = user_gold
-        data['date'] = datetime.datetime.now().strftime('%Y-%m-%d')
-
 
 # 登陆nutaku账号；
 # 请求成功后，将返回的cookie存储与本地文件中，以便后续使用；
@@ -131,8 +130,9 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
                 json.dump(login_cookies, _file)
             print(success_message)
             print('---> 重新请求nutaku主页，并获取calendar_id.')
+            cookies = cookies | login_cookies
             home_resp = get_nutaku_home(cookies=cookies, proxies=proxies)
-            cookies = cookies | login_cookies | home_resp.cookies.get_dict()
+            cookies = cookies | home_resp.cookies.get_dict()
             calendar_id = get_calendar_id(home_resp.text)
             if calendar_id is not None:
                 print(success_message)
@@ -194,18 +194,26 @@ def redeem(config, clearing=False):
 
 
 def listener(event, sd, conf):
-    print(f'Job {event.job_id} raised {event.exception.__class__.__name__}')
-    today = datetime.date.today()
-    tomorrow = today + datetime.timedelta(days=1)
-    # 获取当前时间，加上时间间隔
-    next_time = datetime.datetime.now() + datetime.timedelta(minutes=conf.get('settings', 'retrying_interval'))
-    print(f'---> 将会在{next_time}进行重试.')
-    # 如果已经到第二天时，不再执行
-    if next_time < tomorrow:
-        sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf])
-    else:
-        dateFormat = '{}/{}/{}'.format(today.year, today.month, today.day)
-        print('---> {}签到失败，已经逾期.'.format(dateFormat))
+    if event.code == EVENT_JOB_EXECUTED:
+        print('---> 任务执行完毕.')
+    elif event.code == EVENT_JOB_ERROR:
+        today = datetime.date.today()
+        tomorrow = today + datetime.timedelta(days=1)
+        # 获取当前时间，加上时间间隔
+        next_time = datetime.datetime.now() + datetime.timedelta(minutes=int(conf.get('settings', 'retrying_interval')))
+        print(f'---> 将会在{next_time}进行重试.')
+        # 如果已经到第二天时，不再执行
+        if next_time < tomorrow:
+            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf])
+        else:
+            dateFormat = '{}/{}/{}'.format(today.year, today.month, today.day)
+            print('---> {}签到失败，已经逾期.'.format(dateFormat))
+    elif event.code == EVENT_SCHEDULER_RESUMED:
+        print('---> 恢复运行.')
+        print(sd.get_jobs())
+        # 如果jobs不为空的话，将旧的删除，并添加新的
+    elif event.code == EVENT_SCHEDULER_SHUTDOWN:
+        print('---> 停止运行.')
 
 
 def wrapper(fn, sd, conf):
@@ -221,10 +229,11 @@ def clear(tips: bool):
         print()
 
 
-def execute_task_if_necessary(execution_time, config):
+def execute_task_if_necessary(execution_time: dict, config: dict):
     now = datetime.datetime.now()
     hour = now.hour
-    if hour > execution_time['hours']:
+    minute = now.minute
+    if hour > execution_time['hours'] or minute > execution_time['minutes']:
         data_file_path = config.get('sys', 'dir') + '/data.json'
         if os.path.exists(data_file_path):
             with open(data_file_path, 'r') as file:
@@ -233,7 +242,15 @@ def execute_task_if_necessary(execution_time, config):
                 date = now.strftime('%Y-%m-%d')
                 if data['date'] != date:
                     next_time = now + datetime.timedelta(minutes=1)
-                    scheduler.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[config])
+                    scheduler.add_job(id='003', func=redeem, trigger='date', next_run_time=next_time, args=[config])
+                else:
+                    print('---> {}任务已完成.'.format(data))
+
+
+# def task1():
+#     now = datetime.datetime.now()
+#     date = now.strftime('%Y-%m-%d %H:%M:%S')
+#     print('---> 现在是：' + date)
 
 
 """
@@ -250,11 +267,13 @@ if __name__ == '__main__':
     config.set('sys', 'dir', current_dir)
     print(success_message)
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
-    scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_JOB_ERROR)
+    scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
     execute_task_if_necessary(execution_time, config)
     scheduler.add_job(id='001', func=redeem, trigger='cron',
                       hour=execution_time['hours'], minute=execution_time['minutes'],
-                      args=[config, True])
+                      args=[config, True], misfire_grace_time=60 * 60 * 12)
+    # scheduler.add_job(id='t-001', func=task1, trigger='cron',
+    #                   minute=execution_time['minutes'])
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

@@ -16,4 +16,4 @@ retrying=10
 # 重试间隔（单位，分钟）
 retrying_interval=10
 # 执行时间（以24小时制为准，00:00-23:59）
-execution_time=09:00
+execution_time=12:25

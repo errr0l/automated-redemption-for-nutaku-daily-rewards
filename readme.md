@@ -32,6 +32,12 @@ retrying_interval=10
 execution_time=09:00
 ```
 
+## 运行
+
+> python src/main.py
+
+打包后再运行也ok。
+
 ## 打包
 
 将项目打包为可执行文件，以脱离python环境运行（指的是不需要安装python及其依赖）。
@@ -39,6 +45,8 @@ execution_time=09:00
 pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只能打包为mac的可执行文件，此外还要保证pyinstaller已经添加到系统路径中。
 
 > pyinstaller main.spec
+
+pyinstaller -F src/main.py --add-data "src/config.txt:config"
 
 ## 项目依赖
 

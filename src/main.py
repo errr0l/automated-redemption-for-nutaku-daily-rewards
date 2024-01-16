@@ -5,7 +5,7 @@ import sys
 import requests
 import configparser
 import urllib.parse
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from json import JSONDecodeError
@@ -151,10 +151,10 @@ def parse_execution_time(execution_time: str):
     return {'hours': hours, 'minutes': minutes}
 
 
-def redeem(config, clearing=False, checked=False):
+def redeem(config, clearing=False, skip=False):
     if clearing:
         clear(True)
-    if checked or not check(None, config):
+    if skip or not check(None, config):
         cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
@@ -191,9 +191,7 @@ def redeem(config, clearing=False, checked=False):
 
 
 def listener(event, sd, conf):
-    if event.code == EVENT_JOB_EXECUTED:
-        print('---> 签到完成.')
-    elif event.code == EVENT_JOB_ERROR:
+    if event.code == EVENT_JOB_ERROR:
         today = datetime.date.today()
         tomorrow = today + datetime.timedelta(days=1)
         # 获取当前时间，加上时间间隔
@@ -268,7 +266,7 @@ if __name__ == '__main__':
     scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
     scheduler.add_job(id='001', func=redeem, trigger='cron',
                       hour=execution_time['hours'], minute=execution_time['minutes'],
-                      args=[config, True], misfire_grace_time=60 * 60 * 6)
+                      args=[config, True], misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

@@ -12,9 +12,10 @@ nutaku金币活动自动签到脚本。
 > src/config.txt
 ```text
 # 账号相关（邮箱、密码）
+# 本程序不会收集&存储任何与账号相关的数据
 [account]
 email=err0l@qq.com
-password=12321
+password=Xi12321@cm
 
 # 代理（梯子）
 [network]
@@ -25,11 +26,13 @@ proxy=127.0.0.1:7890
 # 邮箱通知；以当前账号为准（on=启用，off=关闭）
 email_notification=on
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
-retrying=10
+retrying=5
 # 重试间隔（单位，分钟）
-retrying_interval=10
-# 执行时间（以24小时制为准，00:00-23:59）
-execution_time=09:00
+retrying_interval=30
+# 执行时间（以24小时制为准，00:00-23:59；以下的含义为在6点、12点、18点30分执行任务，但不一定准确，比如由于电脑进入休眠/睡眠状态时，程序会停止运行，此时就会导致延迟执行）
+# 如果在某个时间点已经完成签到，则其他时间点不会再次签到，多个时间点只是为了增加容错
+execution_time=6,12,18:30
+
 ```
 
 ## 运行
@@ -45,8 +48,6 @@ execution_time=09:00
 pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只能打包为mac的可执行文件，此外还要保证pyinstaller已经添加到系统路径中。
 
 > pyinstaller main.spec
-
-pyinstaller -F src/main.py --add-data "src/config.txt:config"
 
 ## 项目依赖
 

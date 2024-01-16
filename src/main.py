@@ -5,8 +5,7 @@ import sys
 import requests
 import configparser
 import urllib.parse
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED, EVENT_SCHEDULER_RESUMED, \
-    EVENT_SCHEDULER_SHUTDOWN
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from json import JSONDecodeError
@@ -91,6 +90,7 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
     with open(data_file_path, 'w') as _file:
         json.dump(data, _file)
 
+
 # 登陆nutaku账号；
 # 请求成功后，将返回的cookie存储与本地文件中，以便后续使用；
 def login(config, cookies, proxies):
@@ -148,54 +148,51 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
 
 def parse_execution_time(execution_time: str):
     hours, minutes = execution_time.split(":")
-    hours = int(hours)
-    minutes = int(minutes)
-    if (hours < 0 or hours > 23) or (minutes < 0 or minutes > 59):
-        raise RuntimeError('---> 执行时间格式错误.')
     return {'hours': hours, 'minutes': minutes}
 
 
-def redeem(config, clearing=False):
+def redeem(config, clearing=False, checked=False):
     if clearing:
         clear(True)
-    cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
-    # 尝试读取本地cookie文件
-    local_cookies = {}
-    print('---> 读取本地cookies.')
-    if os.path.exists(cookie_file_path):
-        with open(cookie_file_path, 'r') as file:
-            jsonStr = file.read()
-            if len(jsonStr) > 0:
-                local_cookies = json.loads(jsonStr)
-                print(success_message)
-            else:
-                print('---> 文件内容为空.')
-    else:
-        print('---> 本地cookies不存在.')
-    proxies = {
-        'http': config.get('network', 'proxy')
-    }
-    print('---> 请求nutaku主页.')
-    home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies)
-    # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
-    merged = local_cookies | home_resp.cookies.get_dict()
-    print(success_message)
-    print('---> 获取calendar_id.')
-    calendar_id = get_calendar_id(home_resp.text)
-    # 未登陆或登陆已失效
-    if calendar_id is None:
-        print(fail_message)
-        print('---> 尝试重新登陆账号.')
-        # 登陆返回的cookie包含Nutaku_TOKEN
-        logging_in_handler(config=config, cookies=merged, cookie_file_path=cookie_file_path, proxies=proxies)
-    else:
+    if checked or not check(None, config):
+        cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
+        # 尝试读取本地cookie文件
+        local_cookies = {}
+        print('---> 读取本地cookies.')
+        if os.path.exists(cookie_file_path):
+            with open(cookie_file_path, 'r') as file:
+                jsonStr = file.read()
+                if len(jsonStr) > 0:
+                    local_cookies = json.loads(jsonStr)
+                    print(success_message)
+                else:
+                    print('---> 文件内容为空.')
+        else:
+            print('---> 本地cookies不存在.')
+        proxies = {
+            'http': config.get('network', 'proxy')
+        }
+        print('---> 请求nutaku主页.')
+        home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies)
+        # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
+        merged = local_cookies | home_resp.cookies.get_dict()
         print(success_message)
-        getting_rewards_handler(cookies=merged, calendar_id=calendar_id, proxies=proxies, config=config)
+        print('---> 获取calendar_id.')
+        calendar_id = get_calendar_id(home_resp.text)
+        # 未登陆或登陆已失效
+        if calendar_id is None:
+            print(fail_message)
+            print('---> 尝试重新登陆账号.')
+            # 登陆返回的cookie包含Nutaku_TOKEN
+            logging_in_handler(config=config, cookies=merged, cookie_file_path=cookie_file_path, proxies=proxies)
+        else:
+            print(success_message)
+            getting_rewards_handler(cookies=merged, calendar_id=calendar_id, proxies=proxies, config=config)
 
 
 def listener(event, sd, conf):
     if event.code == EVENT_JOB_EXECUTED:
-        print('---> 任务执行完毕.')
+        print('---> 签到完成.')
     elif event.code == EVENT_JOB_ERROR:
         today = datetime.date.today()
         tomorrow = today + datetime.timedelta(days=1)
@@ -208,12 +205,6 @@ def listener(event, sd, conf):
         else:
             dateFormat = '{}/{}/{}'.format(today.year, today.month, today.day)
             print('---> {}签到失败，已经逾期.'.format(dateFormat))
-    elif event.code == EVENT_SCHEDULER_RESUMED:
-        print('---> 恢复运行.')
-        print(sd.get_jobs())
-        # 如果jobs不为空的话，将旧的删除，并添加新的
-    elif event.code == EVENT_SCHEDULER_SHUTDOWN:
-        print('---> 停止运行.')
 
 
 def wrapper(fn, sd, conf):
@@ -229,28 +220,34 @@ def clear(tips: bool):
         print()
 
 
-def execute_task_if_necessary(execution_time: dict, config: dict):
+# 检查任务是否已经执行；True表示已经执行，False表示未执行
+def check(data, config: dict, printing: bool = True):
     now = datetime.datetime.now()
-    hour = now.hour
-    minute = now.minute
-    if hour > execution_time['hours'] or minute > execution_time['minutes']:
+    date = now.strftime('%Y-%m-%d')
+    print('---> 检查中...')
+    if data is None:
         data_file_path = config.get('sys', 'dir') + '/data.json'
         if os.path.exists(data_file_path):
             with open(data_file_path, 'r') as file:
                 jsonStr = file.read()
                 data = json.loads(jsonStr)
-                date = now.strftime('%Y-%m-%d')
-                if data['date'] != date:
-                    next_time = now + datetime.timedelta(minutes=1)
-                    scheduler.add_job(id='003', func=redeem, trigger='date', next_run_time=next_time, args=[config])
-                else:
-                    print('---> {}任务已完成.'.format(data))
+        else:
+            data = {'date': '-'}
+    if data['date'] is None:
+        raise RuntimeError('---> 数据格式错误：' + data)
+    if data['date'] != date:
+        if printing:
+            print('---> 即将执行签到.')
+        return False
+    if printing:
+        print('---> {}签到已完成.'.format(date))
+    return True
 
 
-# def task1():
-#     now = datetime.datetime.now()
-#     date = now.strftime('%Y-%m-%d %H:%M:%S')
-#     print('---> 现在是：' + date)
+def task1():
+    now = datetime.datetime.now()
+    date = now.strftime('%Y-%m-%d %H:%M:%S')
+    print('---> 现在是：' + date)
 
 
 """
@@ -259,7 +256,8 @@ todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要�
 if __name__ == '__main__':
     clear(True)
     scheduler = BlockingScheduler()
-    current_dir = os.path.dirname(sys.argv[0])
+    _path = sys.argv[0]
+    current_dir = os.path.dirname(_path)
     print('---> 当前目录为：' + current_dir)
     print('---> 读取配置文件.')
     config = get_config(current_dir)
@@ -268,12 +266,9 @@ if __name__ == '__main__':
     print(success_message)
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
     scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
-    execute_task_if_necessary(execution_time, config)
     scheduler.add_job(id='001', func=redeem, trigger='cron',
                       hour=execution_time['hours'], minute=execution_time['minutes'],
-                      args=[config, True], misfire_grace_time=60 * 60 * 12)
-    # scheduler.add_job(id='t-001', func=task1, trigger='cron',
-    #                   minute=execution_time['minutes'])
+                      args=[config, True], misfire_grace_time=60 * 60 * 6)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

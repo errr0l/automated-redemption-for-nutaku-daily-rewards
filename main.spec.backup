@@ -1,8 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import shutil
 
-# -*- mode: python ; coding: utf-8 -*-
-
 
 a = Analysis(
     ['src/main.py'],
@@ -24,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Automated-Redemption',
+    name='Automated Redemption',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

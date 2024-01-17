@@ -5,3 +5,4 @@ src/cookies.json
 main.spec
 .DS_Store
 .idea
+src/config.txt

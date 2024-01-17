@@ -2,10 +2,13 @@ import json
 import os
 import datetime
 import sys
+import threading
+import time
+import logging
 import requests
 import configparser
 import urllib.parse
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from json import JSONDecodeError
@@ -17,6 +20,8 @@ fail_message = '---> 失败.'
 fail_message2 = '---> 失败，'
 UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 '
       'Safari/605.1.15')
+logger = logging.getLogger("Automated Redemption")
+logger.setLevel(logging.INFO)
 
 
 # 读取配置文件【账号&密码】
@@ -48,7 +53,7 @@ def get_nutaku_home(cookies, proxies):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-
+    logger.debug("headers: {}".format(headers))
     resp = requests.get(url, headers=headers, proxies=proxies)
     if resp.status_code == 200:
         return resp
@@ -68,6 +73,9 @@ def get_rewards(cookies, calendar_id, proxies):
         "Cookie": urllib.parse.urlencode(cookies).replace("&", ";")
     }
     data = "calendar_id={}".format(calendar_id)
+
+    logger.debug("headers: {}".format(headers))
+    logger.debug("data: {}".format(data))
     resp = requests.post(url, headers=headers, data=data, proxies=proxies)
     # 请求成功时，将会返回{"userGold": "1"}
     if resp.status_code == 200:
@@ -81,6 +89,7 @@ def get_rewards(cookies, calendar_id, proxies):
 def getting_rewards_handler(cookies, calendar_id, proxies, config):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, calendar_id=calendar_id, proxies=proxies)
+    logger.debug("resp_data: {}".format(reward_resp_data))
     print(success_message)
     user_gold = reward_resp_data['userGold']
     print("---> 当前金币为：" + user_gold + "\n")
@@ -89,6 +98,13 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
 
     with open(data_file_path, 'w') as _file:
         json.dump(data, _file)
+
+
+# 如果为模式2时，签到完后，退出程序
+def exit_if_necessary(config):
+    is_mode_2 = config.get('settings', 'execution_mode') == '2'
+    if is_mode_2:
+        sys.exit()
 
 
 # 登陆nutaku账号；
@@ -109,7 +125,8 @@ def login(config, cookies, proxies):
 
     data = "email={}&password={}&rememberMe=1&pre_register_title_id=".format(config.get('account', 'email'),
                                                                              config.get('account', 'password'))
-
+    logger.debug('headers: {}'.format(headers))
+    logger.debug('data: {}'.format(data))
     url = 'https://www.nutaku.net/execute-login/'
     resp = requests.post(url, headers=headers, data=data, proxies=proxies)
     # 返回的是一个重定向链接，token是在cookie中
@@ -123,8 +140,9 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
     print("---> 开始登陆.")
     loginResp = login(config=config, cookies=cookies, proxies=proxies)
     try:
-        respData = loginResp.json()
-        if respData['redirectURL'] is not None:
+        resp_data = loginResp.json()
+        logger.debug("resp_data: {}".format(resp_data))
+        if resp_data['redirectURL'] is not None:
             login_cookies = loginResp.cookies.get_dict()
             with open(cookie_file_path, 'w') as _file:
                 json.dump(login_cookies, _file)
@@ -139,7 +157,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
                 getting_rewards_handler(cookies=cookies, calendar_id=calendar_id, proxies=proxies, config=config)
             else:
                 raise RuntimeError(fail_message2 + err_message)
-        elif respData['status'] == 'error':
+        elif resp_data['status'] == 'error':
             print('---> 账号或密码错误，请重新输入后再启动程序.')
             sys.exit()
     except JSONDecodeError:
@@ -151,10 +169,10 @@ def parse_execution_time(execution_time: str):
     return {'hours': hours, 'minutes': minutes}
 
 
-def redeem(config, clearing=False, skip=False):
+def redeem(config, clearing=False):
     if clearing:
         clear(True)
-    if skip or not check(None, config):
+    if not check(config):
         cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
@@ -191,18 +209,27 @@ def redeem(config, clearing=False, skip=False):
 
 
 def listener(event, sd, conf):
-    if event.code == EVENT_JOB_ERROR:
+    if event.code == EVENT_JOB_EXECUTED:
+        if event.job_id == '001' or event.job_id == '002':
+            exit_if_necessary(conf)
+    elif event.code == EVENT_JOB_ERROR:
         today = datetime.date.today()
         tomorrow = today + datetime.timedelta(days=1)
         # 获取当前时间，加上时间间隔
-        next_time = datetime.datetime.now() + datetime.timedelta(minutes=int(conf.get('settings', 'retrying_interval')))
+        next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         print(f'---> 将会在{next_time}进行重试.')
         # 如果已经到第二天时，不再执行
         if next_time < tomorrow:
-            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf])
+            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf],
+                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
         else:
-            dateFormat = '{}/{}/{}'.format(today.year, today.month, today.day)
+            dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
             print('---> {}签到失败，已经逾期.'.format(dateFormat))
+
+
+def get_next_time(minutes):
+    next_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+    return next_time
 
 
 def wrapper(fn, sd, conf):
@@ -218,19 +245,18 @@ def clear(tips: bool):
         print()
 
 
-# 检查任务是否已经执行；True表示已经执行，False表示未执行
-def check(data, config: dict, printing: bool = True):
+# 检查任务是否已经执行；True表示已经签到，False表示未签到
+def check(config: dict, printing: bool = True):
     now = datetime.datetime.now()
     date = now.strftime('%Y-%m-%d')
     print('---> 检查中...')
-    if data is None:
-        data_file_path = config.get('sys', 'dir') + '/data.json'
-        if os.path.exists(data_file_path):
-            with open(data_file_path, 'r') as file:
-                jsonStr = file.read()
-                data = json.loads(jsonStr)
-        else:
-            data = {'date': '-'}
+    data_file_path = config.get('sys', 'dir') + '/data.json'
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r') as file:
+            jsonStr = file.read()
+            data = json.loads(jsonStr)
+    else:
+        data = {'date': '-'}
     if data['date'] is None:
         raise RuntimeError('---> 数据格式错误：' + data)
     if data['date'] != date:
@@ -242,10 +268,25 @@ def check(data, config: dict, printing: bool = True):
     return True
 
 
-def task1():
-    now = datetime.datetime.now()
-    date = now.strftime('%Y-%m-%d %H:%M:%S')
-    print('---> 现在是：' + date)
+def get_dict_params(mode):
+    params = {}
+    if mode == '1':
+        params['hour'] = execution_time['hours']
+        params['minute'] = execution_time['minutes']
+        params['trigger'] = 'cron'
+    else:
+        params['trigger'] = 'date'
+        params['next_time'] = get_next_time(1)
+    return params
+
+
+# 使用额外线程，每30分钟唤醒一次scheduler
+def jobs_checker(sc):
+    while True:
+        logger.debug('任务检查线程休眠...')
+        time.sleep(60 * 30)
+        logger.debug('任务检查线程休眠；唤醒定时任务调度器...')
+        sc.wakeup()
 
 
 """
@@ -253,21 +294,35 @@ todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要�
 """
 if __name__ == '__main__':
     clear(True)
-    scheduler = BlockingScheduler()
-    _path = sys.argv[0]
-    current_dir = os.path.dirname(_path)
+    current_dir = os.path.dirname(sys.argv[0])
     print('---> 当前目录为：' + current_dir)
     print('---> 读取配置文件.')
     config = get_config(current_dir)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
+
     print(success_message)
+
+    mode = config.get('settings', 'execution_mode')
+    _debug = config.get('settings', 'debug')
+    if _debug == 'on':
+        logging.basicConfig()
+        logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
+
+    scheduler = BlockingScheduler()
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
     scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
-    scheduler.add_job(id='001', func=redeem, trigger='cron',
-                      hour=execution_time['hours'], minute=execution_time['minutes'],
+
+    scheduler.add_job(id='001', func=redeem, **get_dict_params(mode),
                       args=[config, True], misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+
     try:
+        if mode == '1':
+            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
+            jobs_checker_thread.start()
+
         scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    except (KeyboardInterrupt, SystemExit) as e:
+        logger.debug("捕获异常：{}".format(str(e)))
+        print('---> 退出程序.')

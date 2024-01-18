@@ -105,8 +105,8 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
         user_gold = reward_resp_data['userGold']
         print("---> 当前金币为：" + user_gold + "\n")
         data_file_path = config.get('sys', 'dir') + '/data.json'
-        data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d')}
-
+        data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                'email': config.get('account', 'email')}
         with open(data_file_path, 'w') as _file:
             json.dump(data, _file)
 
@@ -196,8 +196,12 @@ def redeem(config, clearing=False):
             with open(cookie_file_path, 'r') as file:
                 jsonStr = file.read()
                 if len(jsonStr) > 0:
-                    local_cookies = json.loads(jsonStr)
-                    print(success_message)
+                    _local_cookies = json.loads(jsonStr)
+                    if _local_cookies['email'] != config.get('account', 'email'):
+                        logger.debug("检测到账号发生变化，停止使用当前加载的cookies.")
+                    else:
+                        local_cookies = _local_cookies
+                        print(success_message)
                 else:
                     print('---> 文件内容为空.')
         else:

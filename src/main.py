@@ -53,7 +53,7 @@ def get_nutaku_home(cookies, proxies):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    logger.debug("headers: {}".format(headers))
+    logger.debug("headers->{}".format(headers))
     resp = requests.get(url, headers=headers, proxies=proxies)
     if resp.status_code == 200:
         return resp
@@ -74,11 +74,18 @@ def get_rewards(cookies, calendar_id, proxies):
     }
     data = "calendar_id={}".format(calendar_id)
 
-    logger.debug("headers: {}".format(headers))
-    logger.debug("data: {}".format(data))
+    logger.debug("headers->{}".format(headers))
+    logger.debug("data->{}".format(data))
     resp = requests.post(url, headers=headers, data=data, proxies=proxies)
     # 请求成功时，将会返回{"userGold": "1"}
-    if resp.status_code == 200:
+    logger.debug("status_code->{}".format(resp.status_code))
+    logger.debug("resp_text->{}".format(resp.text))
+    status_code = resp.status_code
+    if status_code == 422:
+        resp_data = resp.json()
+        resp_data['code'] = status_code
+        return resp_data
+    if status_code == 200:
         try:
             return resp.json()
         except JSONDecodeError:
@@ -89,22 +96,30 @@ def get_rewards(cookies, calendar_id, proxies):
 def getting_rewards_handler(cookies, calendar_id, proxies, config):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, calendar_id=calendar_id, proxies=proxies)
-    logger.debug("resp_data: {}".format(reward_resp_data))
-    print(success_message)
-    user_gold = reward_resp_data['userGold']
-    print("---> 当前金币为：" + user_gold + "\n")
-    data_file_path = config.get('sys', 'dir') + '/data.json'
-    data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d')}
+    logger.debug("resp_data->{}".format(reward_resp_data))
+    if reward_resp_data['code'] == 422:
+        logger.debug("->重复签到.")
+        pass
+    else:
+        print(success_message)
+        user_gold = reward_resp_data['userGold']
+        print("---> 当前金币为：" + user_gold + "\n")
+        data_file_path = config.get('sys', 'dir') + '/data.json'
+        data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d')}
 
-    with open(data_file_path, 'w') as _file:
-        json.dump(data, _file)
+        with open(data_file_path, 'w') as _file:
+            json.dump(data, _file)
 
 
 # 如果为模式2时，签到完后，退出程序
 def exit_if_necessary(config):
     is_mode_2 = config.get('settings', 'execution_mode') == '2'
     if is_mode_2:
-        sys.exit()
+        try:
+            sys.exit()
+        except SystemExit:
+            logger.debug("捕获SystemExit异常.")
+            print('---> 退出程序.')
 
 
 # 登陆nutaku账号；
@@ -125,8 +140,8 @@ def login(config, cookies, proxies):
 
     data = "email={}&password={}&rememberMe=1&pre_register_title_id=".format(config.get('account', 'email'),
                                                                              config.get('account', 'password'))
-    logger.debug('headers: {}'.format(headers))
-    logger.debug('data: {}'.format(data))
+    logger.debug('headers->{}'.format(headers))
+    logger.debug('data->{}'.format(data))
     url = 'https://www.nutaku.net/execute-login/'
     resp = requests.post(url, headers=headers, data=data, proxies=proxies)
     # 返回的是一个重定向链接，token是在cookie中
@@ -141,7 +156,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
     loginResp = login(config=config, cookies=cookies, proxies=proxies)
     try:
         resp_data = loginResp.json()
-        logger.debug("resp_data: {}".format(resp_data))
+        logger.debug("resp_data->{}".format(resp_data))
         if resp_data['redirectURL'] is not None:
             login_cookies = loginResp.cookies.get_dict()
             with open(cookie_file_path, 'w') as _file:
@@ -219,7 +234,7 @@ def listener(event, sd, conf):
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         print(f'---> 将会在{next_time}进行重试.')
         # 如果已经到第二天时，不再执行
-        if next_time < tomorrow:
+        if next_time.date() < tomorrow:
             sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf],
                        misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
         else:
@@ -276,16 +291,16 @@ def get_dict_params(mode):
         params['trigger'] = 'cron'
     else:
         params['trigger'] = 'date'
-        params['next_time'] = get_next_time(1)
+        params['next_run_time'] = get_next_time(1)
     return params
 
 
 # 使用额外线程，每30分钟唤醒一次scheduler
 def jobs_checker(sc):
     while True:
-        logger.debug('任务检查线程休眠...')
+        logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         time.sleep(60 * 30)
-        logger.debug('任务检查线程休眠；唤醒定时任务调度器...')
+        logger.debug('->{} 任务检查线程休眠；唤醒定时任务调度器...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         sc.wakeup()
 
 
@@ -324,5 +339,5 @@ if __name__ == '__main__':
 
         scheduler.start()
     except (KeyboardInterrupt, SystemExit) as e:
-        logger.debug("捕获异常：{}".format(str(e)))
+        logger.debug("捕获异常->{}".format(str(e)))
         print('---> 退出程序.')

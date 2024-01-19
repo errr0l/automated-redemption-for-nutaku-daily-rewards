@@ -97,7 +97,7 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, calendar_id=calendar_id, proxies=proxies)
     logger.debug("resp_data->{}".format(reward_resp_data))
-    if reward_resp_data['code'] == 422:
+    if reward_resp_data['code'] is not None and reward_resp_data['code'] == 422:
         logger.debug("->重复签到.")
         pass
     else:
@@ -303,7 +303,7 @@ def get_dict_params(mode):
 def jobs_checker(sc):
     while True:
         logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        time.sleep(60 * 30)
+        time.sleep(60 * 39)
         logger.debug('->{} 任务检查线程休眠；唤醒定时任务调度器...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         sc.wakeup()
 

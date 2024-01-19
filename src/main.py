@@ -97,18 +97,20 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, calendar_id=calendar_id, proxies=proxies)
     logger.debug("resp_data->{}".format(reward_resp_data))
-    if reward_resp_data['code'] is not None and reward_resp_data['code'] == 422:
+    status_code = reward_resp_data.get('code')
+
+    data_file_path = config.get('sys', 'dir') + '/data.json'
+    data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+            'email': config.get('account', 'email')}
+    if status_code is not None and status_code == 422:
         logger.debug("->重复签到.")
-        pass
     else:
         print(success_message)
         user_gold = reward_resp_data['userGold']
         print("---> 当前金币为：" + user_gold + "\n")
-        data_file_path = config.get('sys', 'dir') + '/data.json'
-        data = {'user_gold': user_gold, 'date': datetime.datetime.now().strftime('%Y-%m-%d'),
-                'email': config.get('account', 'email')}
-        with open(data_file_path, 'w') as _file:
-            json.dump(data, _file)
+        data['user_gold'] = user_gold
+    with open(data_file_path, 'w+') as _file:
+        json.dump(data | json.loads(_file.read()), _file)
 
 
 # 如果为模式2时，签到完后，退出程序
@@ -176,6 +178,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
             print('---> 账号或密码错误，请重新输入后再启动程序.')
             sys.exit()
     except JSONDecodeError:
+        logger.debug("登陆失败，未知原因.")
         raise RuntimeError(fail_message2 + err_message)
 
 
@@ -184,28 +187,32 @@ def parse_execution_time(execution_time: str):
     return {'hours': hours, 'minutes': minutes}
 
 
-def redeem(config, clearing=False):
+def redeem(config, clearing=False, local_data=None):
     if clearing:
         clear(True)
-    if not check(config):
+    if not check(config, True, local_data):
         cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
-        print('---> 读取本地cookies.')
+        print('---> 读取本地cookie.')
         if os.path.exists(cookie_file_path):
             with open(cookie_file_path, 'r') as file:
                 jsonStr = file.read()
                 if len(jsonStr) > 0:
                     _local_cookies = json.loads(jsonStr)
-                    if _local_cookies['email'] != config.get('account', 'email'):
-                        logger.debug("检测到账号发生变化，停止使用当前加载的cookies.")
+                    _email = local_data.get('email')
+                    if _email is not None:
+                        if _email == config.get('account', 'email'):
+                            local_cookies = _local_cookies
+                            print(success_message)
+                        else:
+                            logger.debug("检测到账号发生变化，停止使用当前加载的cookie.")
                     else:
-                        local_cookies = _local_cookies
-                        print(success_message)
+                        logger.debug("data文件邮件为空，停止使用当前加载的cookie.")
                 else:
                     print('---> 文件内容为空.')
         else:
-            print('---> 本地cookies不存在.')
+            print('---> 本地cookie不存在.')
         proxies = {
             'http': config.get('network', 'proxy')
         }
@@ -218,8 +225,11 @@ def redeem(config, clearing=False):
         calendar_id = get_calendar_id(home_resp.text)
         # 未登陆或登陆已失效
         if calendar_id is None:
-            print(fail_message)
-            print('---> 尝试重新登陆账号.')
+            print(fail_message2 + '未登陆或登陆过期')
+            if local_cookies.get('Nutaku_TOKEN') is not None:
+                print('---> 尝试重新登陆账号.')
+            else:
+                print('---> 登陆账号.')
             # 登陆返回的cookie包含Nutaku_TOKEN
             logging_in_handler(config=config, cookies=merged, cookie_file_path=cookie_file_path, proxies=proxies)
         else:
@@ -227,7 +237,7 @@ def redeem(config, clearing=False):
             getting_rewards_handler(cookies=merged, calendar_id=calendar_id, proxies=proxies, config=config)
 
 
-def listener(event, sd, conf):
+def listener(event, sd, conf, local_data):
     if event.code == EVENT_JOB_EXECUTED:
         if event.job_id == '001' or event.job_id == '002':
             exit_if_necessary(conf)
@@ -239,7 +249,7 @@ def listener(event, sd, conf):
         print(f'---> 将会在{next_time}进行重试.')
         # 如果已经到第二天时，不再执行
         if next_time.date() < tomorrow:
-            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf],
+            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf, False, local_data],
                        misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
         else:
             dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
@@ -251,9 +261,9 @@ def get_next_time(minutes):
     return next_time
 
 
-def wrapper(fn, sd, conf):
+def wrapper(fn, sd, conf, local_data):
     def inner(event):
-        return fn(event, sd, conf)
+        return fn(event, sd, conf, local_data)
     return inner
 
 
@@ -265,20 +275,12 @@ def clear(tips: bool):
 
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
-def check(config: dict, printing: bool = True):
+def check(config: dict, printing: bool = True, local_data: dict=None):
     now = datetime.datetime.now()
     date = now.strftime('%Y-%m-%d')
     print('---> 检查中...')
-    data_file_path = config.get('sys', 'dir') + '/data.json'
-    if os.path.exists(data_file_path):
-        with open(data_file_path, 'r') as file:
-            jsonStr = file.read()
-            data = json.loads(jsonStr)
-    else:
-        data = {'date': '-'}
-    if data['date'] is None:
-        raise RuntimeError('---> 数据格式错误：' + data)
-    if data['date'] != date:
+    _date = local_data.get('date')
+    if _date is None or _date != date:
         if printing:
             print('---> 即将执行签到.')
         return False
@@ -308,6 +310,16 @@ def jobs_checker(sc):
         sc.wakeup()
 
 
+def load_data(config: dict):
+    data_file_path = config.get('sys', 'dir') + '/data.json'
+    data = {}
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r') as file:
+            jsonStr = file.read()
+            data = json.loads(jsonStr)
+    return data
+
+
 """
 todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要调用对应的接口（are you over 18 years old？）；
 """
@@ -319,6 +331,7 @@ if __name__ == '__main__':
     config = get_config(current_dir)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
+    local_data = load_data(config)
 
     print(success_message)
 
@@ -331,10 +344,10 @@ if __name__ == '__main__':
 
     scheduler = BlockingScheduler()
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
-    scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
+    scheduler.add_listener(wrapper(listener, scheduler, config, local_data), EVENT_ALL)
 
     scheduler.add_job(id='001', func=redeem, **get_dict_params(mode),
-                      args=[config, True], misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+                      args=[config, True, local_data], misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
 
     try:
         if mode == '1':
@@ -343,5 +356,5 @@ if __name__ == '__main__':
 
         scheduler.start()
     except (KeyboardInterrupt, SystemExit) as e:
-        logger.debug("捕获异常->{}".format(str(e)))
+        logger.debug("捕获异常KeyboardInterrupt&SystemExit")
         print('---> 退出程序.')

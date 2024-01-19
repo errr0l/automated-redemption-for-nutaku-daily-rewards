@@ -13,7 +13,9 @@ if __name__ == '__main__':
 
     next_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
     print(next_time.date() < tomorrow)
-
+    d1 = {'name': 'errol'}
+    d2 = {'name': 'errrrrol'}
+    print(d1 | d2)
     try:
         fn1()
     except SystemExit as e:

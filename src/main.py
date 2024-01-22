@@ -6,12 +6,13 @@ import threading
 import time
 import logging
 import requests
-import configparser
 import urllib.parse
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from json import JSONDecodeError
+from util.email_util import send_email
+from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear
 
 err_message = '请检查网络（代理、梯子等）是否正确.'
 success_message = '---> 成功.'
@@ -22,13 +23,6 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHT
       'Safari/605.1.15')
 logger = logging.getLogger("Automated Redemption")
 logger.setLevel(logging.INFO)
-
-
-# 读取配置文件【账号&密码】
-def get_config(config_dir):
-    config = configparser.ConfigParser()
-    config.read(config_dir + "/config.txt", encoding="utf-8")
-    return config
 
 
 def get_calendar_id(html):
@@ -109,19 +103,19 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
         user_gold = reward_resp_data['userGold']
         print("---> 当前金币为：" + user_gold + "\n")
         data['user_gold'] = user_gold
-    with open(data_file_path, 'w+') as _file:
-        json.dump(data | json.loads(_file.read()), _file)
+        # 邮箱通知
+        if config.get('settings', 'email_notification') == 'on':
+            send_email(config=config, data=data, logger=logger)
 
-
-# 如果为模式2时，签到完后，退出程序
-def exit_if_necessary(config):
-    is_mode_2 = config.get('settings', 'execution_mode') == '2'
-    if is_mode_2:
-        try:
-            sys.exit()
-        except SystemExit:
-            logger.debug("捕获SystemExit异常.")
-            print('---> 退出程序.')
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r+') as _file:
+            json_str = _file.read()
+            merged = data | (json.loads(json_str) if len(json_str) > 0 else {})
+            _file.seek(0)
+            json.dump(merged, _file)
+    else:
+        with open(data_file_path, 'w') as _file:
+            json.dump(data, _file)
 
 
 # 登陆nutaku账号；
@@ -182,11 +176,6 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies):
         raise RuntimeError(fail_message2 + err_message)
 
 
-def parse_execution_time(execution_time: str):
-    hours, minutes = execution_time.split(":")
-    return {'hours': hours, 'minutes': minutes}
-
-
 def redeem(config, clearing=False, local_data=None):
     if clearing:
         clear(True)
@@ -197,9 +186,9 @@ def redeem(config, clearing=False, local_data=None):
         print('---> 读取本地cookie.')
         if os.path.exists(cookie_file_path):
             with open(cookie_file_path, 'r') as file:
-                jsonStr = file.read()
-                if len(jsonStr) > 0:
-                    _local_cookies = json.loads(jsonStr)
+                json_str = file.read()
+                if len(json_str) > 0:
+                    _local_cookies = json.loads(json_str)
                     _email = local_data.get('email')
                     if _email is not None:
                         if _email == config.get('account', 'email'):
@@ -240,7 +229,7 @@ def redeem(config, clearing=False, local_data=None):
 def listener(event, sd, conf, local_data):
     if event.code == EVENT_JOB_EXECUTED:
         if event.job_id == '001' or event.job_id == '002':
-            exit_if_necessary(conf)
+            exit_if_necessary(conf, logger)
     elif event.code == EVENT_JOB_ERROR:
         today = datetime.date.today()
         tomorrow = today + datetime.timedelta(days=1)
@@ -265,13 +254,6 @@ def wrapper(fn, sd, conf, local_data):
     def inner(event):
         return fn(event, sd, conf, local_data)
     return inner
-
-
-def clear(tips: bool):
-    os.system('cls' if os.name == 'nt' else 'clear')
-    if tips:
-        print('>> 按 Ctrl+{0} 退出程序...'.format('Break' if os.name == 'nt' else 'C'))
-        print()
 
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
@@ -310,16 +292,6 @@ def jobs_checker(sc):
         sc.wakeup()
 
 
-def load_data(config: dict):
-    data_file_path = config.get('sys', 'dir') + '/data.json'
-    data = {}
-    if os.path.exists(data_file_path):
-        with open(data_file_path, 'r') as file:
-            jsonStr = file.read()
-            data = json.loads(jsonStr)
-    return data
-
-
 """
 todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要调用对应的接口（are you over 18 years old？）；
 """
@@ -353,8 +325,7 @@ if __name__ == '__main__':
         if mode == '1':
             jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
             jobs_checker_thread.start()
-
         scheduler.start()
-    except (KeyboardInterrupt, SystemExit) as e:
-        logger.debug("捕获异常KeyboardInterrupt&SystemExit")
+    except (RuntimeError, KeyboardInterrupt, SystemExit) as e:
+        logger.debug("捕获异常RuntimeError&KeyboardInterrupt&SystemExit")
         print('---> 退出程序.')

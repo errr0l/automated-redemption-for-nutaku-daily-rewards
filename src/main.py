@@ -48,7 +48,7 @@ def get_nutaku_home(cookies, proxies):
         'Referer': 'https://www.nutaku.net/home/'
     }
     logger.debug("headers->{}".format(headers))
-    resp = requests.get(url, headers=headers, proxies=proxies)
+    resp = requests.get(url, headers=headers, proxies=proxies, timeout=6)
     if resp.status_code == 200:
         return resp
     raise RuntimeError(fail_message2 + err_message)
@@ -70,7 +70,7 @@ def get_rewards(cookies, calendar_id, proxies):
 
     logger.debug("headers->{}".format(headers))
     logger.debug("data->{}".format(data))
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies)
+    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=6)
     # 请求成功时，将会返回{"userGold": "1"}
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
@@ -98,6 +98,7 @@ def getting_rewards_handler(cookies, calendar_id, proxies, config):
             'email': config.get('account', 'email')}
     if status_code is not None and status_code == 422:
         logger.debug("->重复签到.")
+        print('---> {} 已经签到'.format(data.get('date')))
     else:
         print(success_message)
         user_gold = reward_resp_data['userGold']
@@ -139,7 +140,7 @@ def login(config, cookies, proxies):
     logger.debug('headers->{}'.format(headers))
     logger.debug('data->{}'.format(data))
     url = 'https://www.nutaku.net/execute-login/'
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies)
+    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=6)
     # 返回的是一个重定向链接，token是在cookie中
     # {"redirectURL":"https:\/\/www.nutaku.net\/home"}
     if resp.status_code == 200:
@@ -235,14 +236,21 @@ def listener(event, sd, conf, local_data):
         tomorrow = today + datetime.timedelta(days=1)
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
-        print(f'---> 将会在{next_time}进行重试.')
-        # 如果已经到第二天时，不再执行
-        if next_time.date() < tomorrow:
-            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf, False, local_data],
-                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+        retrying = int(conf.get('settings', 'retrying'))
+        if retrying > 1:
+            retrying -= 1
+            conf.set('settings', 'retrying', retrying)
+            print(f'---> 将会在{next_time}进行重试.')
+            # 如果已经到第二天时，不再执行
+            if next_time.date() < tomorrow:
+                sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time, args=[conf, False, local_data],
+                           misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+            else:
+                dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
+                print('---> {}签到失败，已经逾期.'.format(dateFormat))
         else:
-            dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-            print('---> {}签到失败，已经逾期.'.format(dateFormat))
+            print('---> 已到达最大重试次数，将退出程序.')
+            sys.exit()
 
 
 def get_next_time(minutes):
@@ -326,6 +334,7 @@ if __name__ == '__main__':
             jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
             jobs_checker_thread.start()
         scheduler.start()
-    except (RuntimeError, KeyboardInterrupt, SystemExit) as e:
-        logger.debug("捕获异常RuntimeError&KeyboardInterrupt&SystemExit")
+    except (JSONDecodeError, RuntimeError, KeyboardInterrupt, SystemExit) as e:
+        logger.debug("捕获异常JSONDecodeError&RuntimeError&KeyboardInterrupt&SystemExit...")
+        logger.debug(f"错误消息->{e}")
         print('---> 退出程序.')

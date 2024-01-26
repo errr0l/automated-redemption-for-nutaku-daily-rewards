@@ -1,6 +1,7 @@
 import configparser
 import sys, os, json
 
+
 # 读取配置文件【账号&密码】
 def get_config(config_dir):
     config = configparser.ConfigParser()

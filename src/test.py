@@ -21,14 +21,14 @@ if __name__ == '__main__':
     #     fn1()
     # except SystemExit as e:
     #     print("Caught SystemExit")
-    data_file_path = '../dist/abc.json'
+    # data_file_path = '../dist/abc.json'
     #data = {'email12312312313123123123213': '123@46.com'}
 
-    data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
-            'email': 'email'}
-    with open(data_file_path, 'r+') as _file:
-        json_str = _file.read()
-        merged = data | (json.loads(json_str) if len(json_str) > 0 else {})
-        print(merged)
-        _file.seek(0)
-        json.dump(merged, _file)
+    # data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+    #         'email': 'email'}
+    # with open(data_file_path, 'r+') as _file:
+    #     json_str = _file.read()
+    #     merged = data | (json.loads(json_str) if len(json_str) > 0 else {})
+    #     print(merged)
+    #     _file.seek(0)
+    #     json.dump(merged, _file)

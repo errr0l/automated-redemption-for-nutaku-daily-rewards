@@ -16,7 +16,10 @@ if __name__ == '__main__':
     print(next_time.date() < tomorrow)
     d1 = {'name': 'errol'}
     d2 = {'name': 'errrrrol'}
-    print(d1 | d2)
+    d3 = {'a': ''}
+    print(d1 | d2 | d3)
+    print(d3.get('a') is None)
+
     # try:
     #     fn1()
     # except SystemExit as e:

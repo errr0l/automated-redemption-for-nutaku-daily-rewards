@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 import shutil
+import os
 
+current_dir = os.getcwd()
 
 a = Analysis(
     ['src/main.py'],
@@ -37,4 +39,4 @@ exe = EXE(
     entitlements_file=None,
 )
 
-shutil.copyfile('src/config.txt', '{0}/config.txt'.format(DISTPATH))
+shutil.copyfile(current_dir + '/src/config.txt', '{0}/config.txt'.format(DISTPATH))

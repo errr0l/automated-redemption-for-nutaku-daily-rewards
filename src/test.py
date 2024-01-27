@@ -1,6 +1,6 @@
 import datetime
 import json
-import sys
+import sys, os
 from json import JSONDecodeError
 
 def fn1():
@@ -19,6 +19,7 @@ if __name__ == '__main__':
     d3 = {'a': ''}
     print(d1 | d2 | d3)
     print(d3.get('a') is None)
+    print(os.getcwd())
 
     # try:
     #     fn1()

@@ -103,7 +103,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
             'email': config.get('account', 'email')}
     if status_code is not None and status_code == 422:
         logger.debug("result->重复签到.")
-        print('---> {} 已经签到'.format(data.get('date')))
+        print('---> {} 已经签到.'.format(data.get('date')))
     else:
         print(success_message)
         user_gold = reward_resp_data['userGold']
@@ -116,7 +116,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     if os.path.exists(data_file_path):
         with open(data_file_path, 'r+') as _file:
             json_str = _file.read()
-            merged = data | (json.loads(json_str) if len(json_str) > 0 else {})
+            merged = (json.loads(json_str) if len(json_str) > 0 else {}) | data
             _file.seek(0)
             json.dump(merged, _file)
     else:
@@ -155,7 +155,6 @@ def login(config, cookies, proxies, csrf_token):
 
 
 def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
-    print("---> 开始登陆.")
     loginResp = login(config=config, cookies=cookies, proxies=proxies, csrf_token=html_data.get("csrf_token"))
     try:
         resp_data = loginResp.json()
@@ -286,7 +285,7 @@ def check(config: dict, printing: bool = True, local_data: dict = None):
             print('---> 即将执行签到.')
         return False
     if printing:
-        print('---> {}签到已完成.'.format(date))
+        print('---> {} 签到已完成.'.format(date))
     return True
 
 
@@ -323,8 +322,6 @@ if __name__ == '__main__':
     config = get_config(current_dir)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
-    local_data = load_data(config)
-
     print(success_message)
 
     mode = config.get('settings', 'execution_mode')
@@ -333,6 +330,10 @@ if __name__ == '__main__':
         logging.basicConfig()
         logging.getLogger('apscheduler').setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
+
+    logger.debug("->加载本地数据.")
+    local_data = load_data(config)
+    logger.debug("->{}".format(local_data))
 
     scheduler = BlockingScheduler()
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))

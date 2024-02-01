@@ -1,18 +1,21 @@
-import json
-import os
 import datetime
+import json
+import logging
+import os
 import sys
 import threading
 import time
-import logging
-import requests
 import urllib.parse
+from json import JSONDecodeError
+
+import requests
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_ALL, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
-from json import JSONDecodeError
+
+from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear, \
+    kill_process
 from util.email_util import send_email
-from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear
 
 err_message = '请检查网络（代理、梯子等）是否正确.'
 success_message = '---> 成功.'
@@ -30,9 +33,13 @@ def parse_html_for_data(html):
     rewards_calendar_ele = soup.find('section', {'class': 'js-rewards-calendar'})
 
     meta_ele = soup.find('meta', {'name': 'csrf-token'})
+    # 表示是否已经全部签到完成（无可再签）
+    all_cards_claimed_ele = soup.find('span', {'class': 'all-cards-claimed'})
     return {
         'csrf_token': meta_ele.attrs['content'],
-        'calendar_id': rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
+        'calendar_id': rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None,
+        'destination': all_cards_claimed_ele is not None
+        # 'destination': True
     }
 
 
@@ -102,7 +109,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
             'email': config.get('account', 'email')}
     if status_code is not None and status_code == 422:
-        logger.debug("result->重复签到.")
+        logger.debug("结果->重复签到或其他（多数为重复签到）.")
         print('---> {} 已经签到.'.format(data.get('date')))
     else:
         print(success_message)
@@ -113,15 +120,19 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
         if config.get('settings', 'email_notification') == 'on':
             send_email(config=config, data=data, logger=logger)
 
-    if os.path.exists(data_file_path):
-        with open(data_file_path, 'r+') as _file:
-            json_str = _file.read()
-            merged = (json.loads(json_str) if len(json_str) > 0 else {}) | data
-            _file.seek(0)
-            json.dump(merged, _file)
-    else:
-        with open(data_file_path, 'w') as _file:
-            json.dump(data, _file)
+    # 创建文件
+    if os.path.exists(data_file_path) is False:
+        with open(data_file_path, 'w'):
+            pass
+
+    with open(data_file_path, 'r') as _file:
+        json_str = _file.read()
+        is_not_empty = len(json_str) > 0
+        merged = (json.loads(json_str) if is_not_empty else {}) | data
+        # 清空文件内容，再重新写入
+        if is_not_empty:
+            _file.truncate()
+        json.dump(merged, _file)
 
 
 # 登陆nutaku账号；
@@ -170,14 +181,18 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
             cookies = cookies | home_resp.cookies.get_dict()
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
+            if html_data.get("destination"):
+                kill_process()
+                return
             if html_data.get("calendar_id") is not None:
                 print(success_message)
                 getting_rewards_handler(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
             else:
                 raise RuntimeError(fail_message2 + err_message)
         elif resp_data['status'] == 'error':
+            logger.debug("签到出现异常.")
             print('---> 账号或密码错误，请重新输入后再启动程序.')
-            sys.exit()
+            kill_process()
     except JSONDecodeError:
         logger.debug("登陆失败，未知原因.")
         raise RuntimeError(fail_message2 + err_message)
@@ -186,7 +201,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
 def redeem(config, clearing=False, local_data=None):
     if clearing:
         clear(True)
-    if not check(config, True, local_data):
+    if not check(True, local_data):
         cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
@@ -197,14 +212,15 @@ def redeem(config, clearing=False, local_data=None):
                 if len(json_str) > 0:
                     _local_cookies = json.loads(json_str)
                     _email = local_data.get('email')
+                    logger.debug("记录的账号->{}".format(_email))
                     if _email is not None:
                         if _email == config.get('account', 'email'):
                             local_cookies = _local_cookies
                             print(success_message)
                         else:
-                            logger.debug("检测到账号发生变化，停止使用当前加载的cookie.")
+                            print('---> 检测到账号发生变化，停止使用当前加载的cookie.')
                     else:
-                        logger.debug("data文件邮件为空，停止使用当前加载的cookie.")
+                        print('---> 记录的账号为空，停止使用当前加载的cookie.')
                 else:
                     print('---> 文件内容为空.')
         else:
@@ -219,6 +235,10 @@ def redeem(config, clearing=False, local_data=None):
         print(success_message)
         print('---> 获取calendar_id与csrf_token.')
         html_data = parse_html_for_data(home_resp.text)
+        # exit_if_arriving_at_the_destination(html_data)
+        if html_data.get("destination"):
+            kill_process()
+            return
         # 未登陆或登陆已失效
         if html_data.get('calendar_id') is None:
             print(fail_message2 + '未登陆或登陆过期')
@@ -235,6 +255,11 @@ def redeem(config, clearing=False, local_data=None):
 
 
 def listener(event, sd, conf, local_data):
+    # 如果为SystemExit时，不处理
+    # if isinstance(event, JobExecutionEvent) and event.exception.__class__.__name__ == 'SystemExit':
+    #     logger.debug("关闭定时调度器.")
+    #     sd.shutdown()
+    # else:
     if event.code == EVENT_JOB_EXECUTED:
         logger.debug("任务执行完成.")
         if event.job_id == '001' or event.job_id == '002':
@@ -256,10 +281,11 @@ def listener(event, sd, conf, local_data):
                            misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
             else:
                 dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('---> {}签到失败，已经逾期.'.format(dateFormat))
+                print('---> {} 签到失败，已经逾期.'.format(dateFormat))
+                exit_if_necessary(conf, logger)
         else:
-            print('---> 已到达最大重试次数，将退出程序.')
-            sys.exit()
+            print('---> 已到达最大重试次数，将停止签到，如本日签到还未完成时，请手动签到.')
+            exit_if_necessary(conf, logger)
 
 
 def get_next_time(minutes):
@@ -270,12 +296,11 @@ def get_next_time(minutes):
 def wrapper(fn, sd, conf, local_data):
     def inner(event):
         return fn(event, sd, conf, local_data)
-
     return inner
 
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
-def check(config: dict, printing: bool = True, local_data: dict = None):
+def check(printing: bool = True, local_data: dict = None):
     now = datetime.datetime.now()
     date = now.strftime('%Y-%m-%d')
     print('---> 检查中...')

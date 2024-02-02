@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 import shutil
+import os
+import platform
 
+current_dir = os.getcwd()
+system_name = platform.system()
+_split = "\\" if system_name == 'Windows' else '/'
 
 a = Analysis(
     ['src/main.py'],
@@ -22,7 +27,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Automated Redemption',
+    name='Automated-Redemption',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -37,4 +42,6 @@ exe = EXE(
     entitlements_file=None,
 )
 
-shutil.copyfile('src/config.txt', '{0}/config.txt'.format(DISTPATH))
+#shutil.copyfile(current_dir + '/src/config.txt', '{0}/config.txt'.format(DISTPATH))
+path = ['', 'src', 'config.txt']
+shutil.copyfile(current_dir + _split.join(path), '{0}{1}{2}'.format(DISTPATH, _split, path[2]))

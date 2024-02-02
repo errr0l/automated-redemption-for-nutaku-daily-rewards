@@ -4,13 +4,8 @@
 name: 将项目打包为可执行程序
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-permissions:
-  contents: read
 
 jobs:
   build:

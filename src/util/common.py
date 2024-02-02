@@ -1,4 +1,5 @@
 import configparser
+import signal
 import sys, os, json
 
 
@@ -14,15 +15,16 @@ def parse_execution_time(execution_time: str):
     return {'hours': hours, 'minutes': minutes}
 
 
+def kill_process():
+    pid = os.getpid()
+    os.kill(pid, signal.SIGTERM)
+
+
 # 如果为模式2时，签到完后，退出程序
 def exit_if_necessary(config, logger):
     is_mode_2 = config.get('settings', 'execution_mode') == '2'
     if is_mode_2:
-        try:
-            sys.exit()
-        except SystemExit:
-            logger.debug("捕获SystemExit异常.")
-            print('---> 退出程序.')
+        kill_process()
 
 
 def load_data(config: dict):

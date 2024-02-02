@@ -4,6 +4,7 @@ import requests
 # import os
 # import json
 # from src.util.common import get_config
+from requests import ConnectTimeout
 
 
 def send_email(config, data: dict, logger=None):
@@ -17,14 +18,19 @@ def send_email(config, data: dict, logger=None):
     logger.debug(f'headers: {headers}')
     base_url = 'http://errol.shenzhuo.vip:26107/api/easyshop/portal/'
     # base_url = 'http://127.0.0.1:8082/api/'
-    resp = requests.post(url=f'{base_url}email/notification',
-                         json=data, headers=headers, timeout=5)
-    logger.debug(f'resp_text: {resp.text}')
-    resp_data = resp.json()
-    if resp_data.get('code') == 0:
-        logger.debug("已成功发送邮件.")
-    else:
-        logger.debug(f"发送邮件失败->{resp_data.get('message')}")
+    # 超时不管【日常大姨妈】
+    timeout = config.get('settings', 'connection_timeout')
+    try:
+        resp = requests.post(url=f'{base_url}email/notification',
+                             json=data, headers=headers, timeout=int(timeout))
+        logger.debug(f'resp_text: {resp.text}')
+        resp_data = resp.json()
+        if resp_data.get('code') == 0:
+            logger.debug("已成功发送邮件.")
+        else:
+            logger.debug(f"发送邮件失败->{resp_data.get('message')}")
+    except (ConnectionError, ConnectTimeout, TimeoutError) as e:
+        logger.debug('发送邮件失败.')
 
 
 # if __name__ == '__main__':

@@ -89,6 +89,10 @@ def get_rewards(cookies, html_data, proxies, config):
     status_code = resp.status_code
     if status_code == 422:
         resp_data = resp.json()
+        msg = resp_data.get('message')
+        # 未知原因，需要重试
+        if msg == "Couldn't identify reward":
+            raise RuntimeError(fail_message2 + msg)
         resp_data['code'] = status_code
         return resp_data
     if status_code == 200:

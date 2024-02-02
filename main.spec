@@ -43,5 +43,7 @@ exe = EXE(
 )
 
 #shutil.copyfile(current_dir + '/src/config.txt', '{0}/config.txt'.format(DISTPATH))
-path = ['', 'src', 'config.txt']
+path = ['', 'src', 'config.example.txt']
+path2 = ['', 'src', '使用之前看我.txt']
 shutil.copyfile(current_dir + _split.join(path), '{0}{1}{2}'.format(DISTPATH, _split, path[2]))
+shutil.copyfile(current_dir + _split.join(path2), '{0}{1}{2}'.format(DISTPATH, _split, path2[2]))

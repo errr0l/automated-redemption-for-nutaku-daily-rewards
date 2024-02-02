@@ -6,5 +6,4 @@ src/cookies.json
 .idea
 src/config.txt
 src/data.json
-src/cookies.json
 src/*.html

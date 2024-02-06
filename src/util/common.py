@@ -1,6 +1,7 @@
 import configparser
+import json
+import os
 import signal
-import sys, os, json
 
 
 # 读取配置文件【账号&密码】

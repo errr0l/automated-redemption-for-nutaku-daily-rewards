@@ -1,3 +1,5 @@
+from http.client import RemoteDisconnected
+
 import requests
 # import logging
 # import sys
@@ -29,9 +31,8 @@ def send_email(config, data: dict, logger=None):
             logger.debug("已成功发送邮件.")
         else:
             logger.debug(f"发送邮件失败->{resp_data.get('message')}")
-    except (ConnectionError, ConnectTimeout, TimeoutError) as e:
-        logger.debug('发送邮件失败.')
-
+    except (RemoteDisconnected, ConnectionError, ConnectTimeout, TimeoutError) as e:
+        logger.debug(f"发送邮件失败，捕获异常->{e}")
 
 # if __name__ == '__main__':
 #     current_dir = os.path.dirname(sys.argv[0])

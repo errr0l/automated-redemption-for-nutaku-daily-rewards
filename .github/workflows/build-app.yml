@@ -2,11 +2,13 @@
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: 将项目打包为可执行程序
-
 on:
+  push:
+    tags:
+      - '*'
   pull_request:
-    branches: [ "main" ]
-
+    branches: ["main"]
+permissions: write-all
 jobs:
   build:
     runs-on: windows-2019
@@ -25,17 +27,15 @@ jobs:
         python -m PyInstaller main.spec
     - name: Create Release
       id: create_release
-      uses: actions/create-release@latest
+      uses: actions/create-release@v1.1.4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref_name }}
-        release_name: ${{ github.ref_name }}
-        draft: false
-        prerelease: false
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
     - name: Create Zip
       run: |
-        python -m zipfile -c automated-redemption.zip dist/
+        python -m zipfile -c automated-redemption.zip dist/*
     - name: Upload Release Asset
       id: upload_release_asset
       uses: actions/upload-release-asset@v1

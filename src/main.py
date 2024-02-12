@@ -34,12 +34,12 @@ def parse_html_for_data(html):
 
     meta_ele = soup.find('meta', {'name': 'csrf-token'})
     # 表示是否已经全部签到完成（无可再签）
-    all_cards_claimed_ele = soup.find('span', {'class': 'all-cards-claimed'})
+    next_reward = soup.find('div', {'class': 'reward-status-future'})
+    calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
     return {
         'csrf_token': meta_ele.attrs['content'],
-        'calendar_id': rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None,
-        'destination': all_cards_claimed_ele is not None
-        # 'destination': True
+        'calendar_id': calendar_id,
+        'destination': calendar_id is not None and next_reward is None
     }
 
 
@@ -113,7 +113,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
             'email': config.get('account', 'email')}
     if status_code is not None and status_code == 422:
-        logger.debug("结果->重复签到或其他（多数为重复签到）.")
+        logger.debug("结果->重复签到或其他（多为前者）.")
         print('---> {} 已经签到.'.format(data.get('date')))
     else:
         print(success_message)
@@ -129,12 +129,13 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
         with open(data_file_path, 'w'):
             pass
 
-    with open(data_file_path, 'r') as _file:
+    with open(data_file_path, 'r+') as _file:
         json_str = _file.read()
         is_not_empty = len(json_str) > 0
         merged = (json.loads(json_str) if is_not_empty else {}) | data
         # 清空文件内容，再重新写入
         if is_not_empty:
+            _file.seek(0)
             _file.truncate()
         json.dump(merged, _file)
 
@@ -186,6 +187,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
+                print(success_message2 + "已经全部签到完成.")
                 kill_process()
                 return
             if html_data.get("calendar_id") is not None:
@@ -239,8 +241,9 @@ def redeem(config, clearing=False, local_data=None):
         print(success_message)
         print('---> 获取calendar_id与csrf_token.')
         html_data = parse_html_for_data(home_resp.text)
-        # exit_if_arriving_at_the_destination(html_data)
+        logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
+            print(success_message2 + "已经全部签到完成.")
             kill_process()
             return
         # 未登陆或登陆已失效

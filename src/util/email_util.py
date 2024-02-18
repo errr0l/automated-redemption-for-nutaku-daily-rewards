@@ -12,7 +12,8 @@ from requests import ConnectTimeout
 def send_email(config, data: dict, logger=None):
     app_name = 'Automated Redemption'
     email = config.get('account', 'email')
-    content = f'当前账号金币为：{data.get("user_gold")}（若要关闭邮件通知，可在config.txt中将email_notification设为off）'
+    # content = f'当前账号金币为：{data.get("user_gold")}（若要关闭邮件通知，可在config.txt中将email_notification设为off）'
+    content = f'{data.get("content")}（若要关闭邮件通知，可在config.txt中将email_notification设为off）'
     subject = f'{data.get("date")} 签到成功'
     data = {'name': app_name, 'to': email, 'content': content, 'subject': subject}
     headers = {'Content-Type': 'application/json'}

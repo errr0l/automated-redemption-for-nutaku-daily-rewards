@@ -103,6 +103,26 @@ def get_rewards(cookies, html_data, proxies, config):
     raise RuntimeError(fail_message2 + err_message)
 
 
+# 签到获取的物件，除了金币以外，还有优惠卷
+def reward_resp_data_handler(resp_data: dict, data: dict):
+    item = resp_data.get('userGold')
+    _content = "当前签到物件为未知物件"
+    if item is not None:
+        print("---> 当前金币为：" + item + "\n")
+        _content = f'当前账号金币为：{item}'
+    elif resp_data.get('coupon') is not None:
+        item = resp_data.get('coupon')
+        _content = "当前签到物件为优惠卷：{}/{}".format(item.get('title'), item.get('code'))
+        # print("---> 当前签到物件为优惠卷：" + item + "\n")
+        print("---> " + _content + "\n")
+    else:
+        print("---> " + _content + "\n")
+    data['content'] = _content
+    # 邮箱通知
+    if config.get('settings', 'email_notification') == 'on':
+        send_email(config=config, data=data, logger=logger)
+
+
 def getting_rewards_handler(cookies, proxies, config, html_data):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
@@ -117,12 +137,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
         print('---> {} 已经签到.'.format(data.get('date')))
     else:
         print(success_message)
-        user_gold = reward_resp_data['userGold']
-        print("---> 当前金币为：" + user_gold + "\n")
-        data['user_gold'] = user_gold
-        # 邮箱通知
-        if config.get('settings', 'email_notification') == 'on':
-            send_email(config=config, data=data, logger=logger)
+        reward_resp_data_handler(reward_resp_data, data)
 
     # 创建文件
     if os.path.exists(data_file_path) is False:

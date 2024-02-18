@@ -14,7 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 
 from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear, \
-    kill_process
+    kill_process, get_separator
 from util.email_util import send_email
 
 err_message = '请检查网络（代理、梯子等）是否正确.'
@@ -26,6 +26,7 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
 # UA = ('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36')
 logger = logging.getLogger("Automated Redemption")
 logger.setLevel(logging.INFO)
+separator = get_separator()
 
 
 def parse_html_for_data(html):
@@ -129,7 +130,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     logger.debug("resp_data->{}".format(reward_resp_data))
     status_code = reward_resp_data.get('code')
 
-    data_file_path = config.get('sys', 'dir') + '/data.json'
+    data_file_path = config.get('sys', 'dir') + separator + 'data.json'
     data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
             'email': config.get('account', 'email')}
     if status_code is not None and status_code == 422:
@@ -223,7 +224,7 @@ def redeem(config, clearing=False, local_data=None):
     if clearing:
         clear(True)
     if not check(True, local_data):
-        cookie_file_path = config.get('sys', 'dir') + '/cookies.json'
+        cookie_file_path = config.get('sys', 'dir') + separator + 'cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
         print('---> 读取本地cookie.')
@@ -366,7 +367,7 @@ if __name__ == '__main__':
     current_dir = os.path.dirname(sys.argv[0])
     print('---> 当前目录为：' + current_dir)
     print('---> 读取配置文件.')
-    config = get_config(current_dir)
+    config = get_config(current_dir, logger)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
     print(success_message)
@@ -379,7 +380,7 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
 
     logger.debug("->加载本地数据.")
-    local_data = load_data(config)
+    local_data = load_data(config, logger)
     logger.debug("->{}".format(local_data))
 
     scheduler = BlockingScheduler()

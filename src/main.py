@@ -16,14 +16,14 @@ from bs4 import BeautifulSoup
 from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear, \
     kill_process, get_separator
 from util.email_util import send_email
+from util.user_agent_util import get_random_ua
 
 err_message = '请检查网络（代理、梯子等）是否正确.'
 success_message = '---> 成功.'
 success_message2 = '---> 成功，'
 fail_message = '---> 失败.'
 fail_message2 = '---> 失败，'
-UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-# UA = ('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36')
+UA = get_random_ua()
 logger = logging.getLogger("Automated Redemption")
 logger.setLevel(logging.INFO)
 separator = get_separator()
@@ -250,9 +250,12 @@ def redeem(config, clearing=False, local_data=None):
                     print('---> 文件内容为空.')
         else:
             print('---> 本地cookie不存在.')
-        proxies = {
-            'http': config.get('network', 'proxy')
-        }
+
+        proxies = {}
+        if config.get('network', 'proxy') == 'on':
+            proxies['http'] = config.get('network', 'http')
+            proxies['https'] = config.get('network', 'https')
+            logger.debug("启用代理->{}".format(proxies))
         print('---> 请求nutaku主页.')
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
@@ -340,7 +343,7 @@ def check(printing: bool = True, local_data: dict = None):
     return True
 
 
-def get_dict_params(mode):
+def get_dict_params(mode, execution_time):
     params = {}
     if mode == '1':
         params['hour'] = execution_time['hours']
@@ -374,10 +377,8 @@ if __name__ == '__main__':
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
     print(success_message)
-
     mode = config.get('settings', 'execution_mode')
-    _debug = config.get('settings', 'debug')
-    if _debug == 'on':
+    if config.get('settings', 'debug') == 'on':
         logging.basicConfig()
         logging.getLogger('apscheduler').setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
@@ -390,7 +391,7 @@ if __name__ == '__main__':
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
 
     scheduler.add_listener(wrapper(listener, scheduler, config, local_data), EVENT_ALL)
-    scheduler.add_job(id='001', func=redeem, **get_dict_params(mode),
+    scheduler.add_job(id='001', func=redeem, **get_dict_params(mode, execution_time),
                       args=[config, True, local_data],
                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
 

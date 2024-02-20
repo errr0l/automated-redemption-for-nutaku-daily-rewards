@@ -11,12 +11,14 @@ executing==2.0.1
 future==0.18.2
 idna==3.6
 importlib-metadata==7.0.1
+importlib-resources==6.1.1
 jedi==0.19.1
 macholib==1.15.2
 matplotlib-inline==0.1.6
 packaging==23.2
 parso==0.8.3
 pexpect==4.9.0
+pip==21.3.1
 prompt-toolkit==3.0.43
 ptyprocess==0.7.0
 pure-eval==0.2.2

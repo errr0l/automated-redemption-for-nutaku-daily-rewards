@@ -27,6 +27,7 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
 logger = logging.getLogger("Automated Redemption")
 logger.setLevel(logging.INFO)
 separator = get_separator()
+COOKIE = {'Cookie': '***'}
 
 
 def parse_html_for_data(html):
@@ -57,7 +58,7 @@ def get_nutaku_home(cookies, proxies, config):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    logger.debug("headers->{}".format(headers))
+    logger.debug("headers->{}".format(headers | COOKIE))
     timeout = config.get('settings', 'connection_timeout')
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout))
     if resp.status_code == 200:
@@ -68,13 +69,14 @@ def get_nutaku_home(cookies, proxies, config):
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
     url = 'https://www.nutaku.net/rewards-calendar/redeem/'
+    Cookie = "NUTAKUID={}; Nutaku_TOKEN={}"
     headers = {
         "Accept": "application/json, */*; q=0.01",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "x-csrf-token": html_data.get("csrf_token"),
         "User-Agent": UA,
-        "Cookie": "NUTAKUID={}; Nutaku_TOKEN={}".format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN")),
+        "Cookie": Cookie,
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
@@ -83,6 +85,7 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("headers->{}".format(headers))
     logger.debug("data->{}".format(data))
     timeout = config.get('settings', 'connection_timeout')
+    headers['Cookie'] = Cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
     resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout))
     # 请求成功时，将会返回{"userGold": "1"}
     logger.debug("status_code->{}".format(resp.status_code))
@@ -172,13 +175,13 @@ def login(config, cookies, proxies, csrf_token):
         'Referer': 'https://www.nutaku.net/home/'
     }
 
-    data = "email={}&password={}&rememberMe=1&pre_register_title_id=".format(config.get('account', 'email'),
-                                                                             config.get('account', 'password'))
+    data = "email={}&password={}&rememberMe=1&pre_register_title_id="
     logger.debug('headers->{}'.format(headers))
     logger.debug('data->{}'.format(data))
     url = 'https://www.nutaku.net/execute-login/'
     timeout = config.get('settings', 'connection_timeout')
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout))
+    resp = requests.post(url, headers=headers, data=data.format(config.get('account', 'email'), config.get('account', 'password')),
+                         proxies=proxies, timeout=int(timeout))
     # 返回的是一个重定向链接，token是在cookie中
     # {"redirectURL":"https:\/\/www.nutaku.net\/home"}
     if resp.status_code == 200:
@@ -187,12 +190,12 @@ def login(config, cookies, proxies, csrf_token):
 
 
 def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
-    loginResp = login(config=config, cookies=cookies, proxies=proxies, csrf_token=html_data.get("csrf_token"))
+    login_resp = login(config=config, cookies=cookies, proxies=proxies, csrf_token=html_data.get("csrf_token"))
     try:
-        resp_data = loginResp.json()
+        resp_data = login_resp.json()
         logger.debug("resp_data->{}".format(resp_data))
         if resp_data['redirectURL'] is not None:
-            login_cookies = loginResp.cookies.get_dict()
+            login_cookies = login_resp.cookies.get_dict()
             with open(cookie_file_path, 'w') as _file:
                 json.dump(login_cookies, _file)
             print(success_message)
@@ -203,7 +206,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
-                print(success_message2 + "已经全部签到完成.")
+                print("恭喜，已经全部签到完成.")
                 kill_process()
                 return
             if html_data.get("calendar_id") is not None:
@@ -259,7 +262,7 @@ def redeem(config, clearing=False, local_data=None):
         html_data = parse_html_for_data(home_resp.text)
         logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
-            print(success_message2 + "已经全部签到完成.")
+            print("恭喜，已经全部签到完成.")
             kill_process()
             return
         # 未登陆或登陆已失效
@@ -307,7 +310,7 @@ def listener(event, sd, conf, local_data):
                 print('---> {} 签到失败，已经逾期.'.format(dateFormat))
                 exit_if_necessary(conf, logger)
         else:
-            print('---> 已到达最大重试次数，将停止签到，如本日签到还未完成时，请手动签到.')
+            print('---> 已到达最大重试次数，将停止签到；如本日签到还未完成时，请手动签到.')
             exit_if_necessary(conf, logger)
 
 

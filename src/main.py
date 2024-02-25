@@ -36,12 +36,12 @@ def parse_html_for_data(html):
 
     meta_ele = soup.find('meta', {'name': 'csrf-token'})
     # 表示是否已经全部签到完成（无可再签）
-    next_reward = soup.find('div', {'class': 'reward-status-future'})
+    current_reward = soup.find('div', {'class': 'reward-status-current-not-claimed'})
     calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
     return {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': calendar_id is not None and next_reward is None
+        'destination': calendar_id is not None and current_reward is None
     }
 
 

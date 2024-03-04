@@ -6,8 +6,6 @@ import requests
 # import os
 # import json
 # from src.util.common import get_config
-from requests import ConnectTimeout
-from json import JSONDecodeError
 
 
 def send_email(config, data: dict, logger=None):
@@ -37,7 +35,7 @@ def send_email(config, data: dict, logger=None):
                 logger.debug(f"发送邮件失败->{resp_data.get('message')}")
         else:
             logger.debug(f"发送邮件失败")
-    except (RemoteDisconnected, ConnectionError, ConnectTimeout, TimeoutError, JSONDecodeError) as e:
+    except Exception as e:
         logger.debug(f"发送邮件失败，捕获异常->{e}")
 
 # if __name__ == '__main__':

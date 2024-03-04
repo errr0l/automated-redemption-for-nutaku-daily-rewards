@@ -114,9 +114,10 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
     if item is not None:
         print("---> 当前金币为：" + item + "\n")
         _content = f'当前账号金币为：{item}'
+        data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
         item = resp_data.get('coupon')
-        _content = "当前签到物件为优惠卷：{}/{}".format(item.get('title'), item.get('code'))
+        _content = "获取到优惠卷：{}/{}".format(item.get('title'), item.get('code'))
         # print("---> 当前签到物件为优惠卷：" + item + "\n")
         print("---> " + _content + "\n")
     else:
@@ -134,8 +135,11 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     status_code = reward_resp_data.get('code')
 
     data_file_path = config.get('sys', 'dir') + separator + 'data.json'
-    data = {'date': datetime.datetime.now().strftime('%Y-%m-%d'),
-            'email': config.get('account', 'email')}
+    data = {
+        'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+        'email': config.get('account', 'email'),
+        'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d')
+    }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
         print('---> {} 已经签到.'.format(data.get('date')))
@@ -180,7 +184,8 @@ def login(config, cookies, proxies, csrf_token):
     logger.debug('data->{}'.format(data))
     url = 'https://www.nutaku.net/execute-login/'
     timeout = config.get('settings', 'connection_timeout')
-    resp = requests.post(url, headers=headers, data=data.format(config.get('account', 'email'), config.get('account', 'password')),
+    resp = requests.post(url, headers=headers,
+                         data=data.format(config.get('account', 'email'), config.get('account', 'password')),
                          proxies=proxies, timeout=int(timeout))
     # 返回的是一个重定向链接，token是在cookie中
     # {"redirectURL":"https:\/\/www.nutaku.net\/home"}
@@ -223,7 +228,9 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
         raise RuntimeError(fail_message2 + err_message)
 
 
-def redeem(config, clearing=False, local_data=None):
+def redeem(config, clearing=False, local_data: dict = None):
+    if 'limit' not in local_data:
+        set_limit_time(local_data)
     if clearing:
         clear(True)
     if not check(True, local_data):
@@ -283,28 +290,25 @@ def redeem(config, clearing=False, local_data=None):
             getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config)
 
 
-def listener(event, sd, conf, local_data):
-    # 如果为SystemExit时，不处理
-    # if isinstance(event, JobExecutionEvent) and event.exception.__class__.__name__ == 'SystemExit':
-    #     logger.debug("关闭定时调度器.")
-    #     sd.shutdown()
-    # else:
+def listener(event, sd, conf, local_data: dict):
     if event.code == EVENT_JOB_EXECUTED:
         logger.debug("任务执行完成.")
         if event.job_id == '001' or event.job_id == '002':
+            local_data.pop('limit')
             exit_if_necessary(conf, logger)
     elif event.code == EVENT_JOB_ERROR:
-        today = datetime.date.today()
-        tomorrow = today + datetime.timedelta(days=1)
+        today = datetime.datetime.today()
+        limit = local_data.get('limit')
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
+        logger.debug("当前时间：{}".format(today))
+        logger.debug("截止日期：{}".format(limit))
         retrying = int(conf.get('settings', 'retrying'))
         if retrying > 1:
             retrying -= 1
             conf.set('settings', 'retrying', str(retrying))
-            print(f'---> 将会在{next_time}进行重试.')
-            # 如果已经到第二天时，不再执行
-            if next_time.date() < tomorrow:
+            if next_time < limit:
+                print(f'---> 将会在{next_time}进行重试.')
                 sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
                            args=[conf, False, local_data],
                            misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
@@ -322,24 +326,35 @@ def get_next_time(minutes):
     return next_time
 
 
+# 设置签到截止日期
+def set_limit_time(local_data: dict):
+    today = datetime.datetime.today()
+    # 获取第二天早上8点0分0秒的时间，即utc+0的00:00:00，若当前时间已经超过该时间点，将不再执行
+    # limit是相对于today_000的时间
+    today_000 = today.replace(hour=0, minute=0, second=0)
+    limit = today_000 + datetime.timedelta(days=1, hours=8)
+    local_data['limit'] = limit
+
+
 def wrapper(fn, sd, conf, local_data):
     def inner(event):
         return fn(event, sd, conf, local_data)
+
     return inner
 
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
 def check(printing: bool = True, local_data: dict = None):
-    now = datetime.datetime.now()
-    date = now.strftime('%Y-%m-%d')
+    now = datetime.datetime.utcnow()
+    current_utc = now.strftime('%Y-%m-%d')
     print('---> 检查中...')
-    _date = local_data.get('date')
-    if _date is None or _date != date:
+    utc_date = local_data.get('utc_date')
+    if utc_date is None or utc_date != current_utc:
         if printing:
             print('---> 即将执行签到.')
         return False
     if printing:
-        print('---> {} 签到已完成.'.format(date))
+        print('---> {} 签到已完成.'.format(local_data.get('date')))
     return True
 
 

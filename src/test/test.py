@@ -41,4 +41,9 @@ if __name__ == '__main__':
     print(t1.get('a'))
     t1.pop('abc')
     print('abc' not in t1)
+    limit_str = "2024-03-08 12:30:33"
+    a = datetime.datetime.strptime(limit_str, "%Y-%m-%d %H:%M:%S")
+    print(a)
+    t1['b'] = a
+    print(t1)
 

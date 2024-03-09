@@ -49,6 +49,7 @@ def exit_if_necessary(config, logger):
 
 def load_data(config: dict, logger):
     data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+    logger.debug("->加载本地数据.")
     logger.debug("路径为：" + data_file_path)
     data = {}
     if os.path.exists(data_file_path):
@@ -56,6 +57,7 @@ def load_data(config: dict, logger):
             json_str = file.read()
             if len(json_str) > 0:
                 data = json.loads(json_str)
+    logger.debug("->{}".format(data))
     return data
 
 

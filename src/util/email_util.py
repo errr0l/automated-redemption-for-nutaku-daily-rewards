@@ -1,11 +1,9 @@
-from http.client import RemoteDisconnected
-
 import requests
-# import logging
-# import sys
-# import os
-# import json
-# from src.util.common import get_config
+import logging
+import sys
+import os
+import json
+from src.util.common import get_config
 
 
 def send_email(config, data: dict, logger=None):
@@ -38,14 +36,16 @@ def send_email(config, data: dict, logger=None):
     except Exception as e:
         logger.debug(f"发送邮件失败，捕获异常->{e}")
 
-# if __name__ == '__main__':
-#     current_dir = os.path.dirname(sys.argv[0])
-#     print('---> 当前目录为：' + current_dir)
-#     print('---> 读取配置文件.')
-#     config = get_config(current_dir + '/../')
-#     logging.basicConfig()
-#     logger = logging.getLogger(__name__)
-#     logger.setLevel(logging.DEBUG)
-#     with open('../../dist/data.json', 'r') as file:
-#         data = json.load(file)
-#         send_email(config, data=data, logger=logger)
+
+if __name__ == '__main__':
+    current_dir = os.path.dirname(sys.argv[0])
+    print('---> 当前目录为：' + current_dir)
+    print('---> 读取配置文件.')
+
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    config = get_config(current_dir + '/../', logger=logger)
+    with open('../data.json', 'r') as file:
+        data = json.load(file)
+        send_email(config, data=data, logger=logger)

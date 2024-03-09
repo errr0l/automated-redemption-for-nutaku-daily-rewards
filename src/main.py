@@ -23,11 +23,12 @@ success_message = '---> 成功.'
 success_message2 = '---> 成功，'
 fail_message = '---> 失败.'
 fail_message2 = '---> 失败，'
-UA = get_random_ua()
+UA = None
 logger = logging.getLogger("Automated Redemption")
 logger.setLevel(logging.INFO)
 separator = get_separator()
 COOKIE = {'Cookie': '***'}
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def parse_html_for_data(html):
@@ -36,12 +37,14 @@ def parse_html_for_data(html):
 
     meta_ele = soup.find('meta', {'name': 'csrf-token'})
     # 表示是否已经全部签到完成（无可再签）
-    current_reward = soup.find('div', {'class': 'reward-status-current-not-claimed'})
     calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
+    # current_reward = soup.find('div', {'class': 'reward-status-current-not-claimed'})
+    future_reward = soup.find('div', {'class': 'reward-status-future'})
     return {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': calendar_id is not None and current_reward is None
+        'destination': calendar_id is not None and future_reward is None
+        and soup.find('div', {'class': 'reward-status-current-not-claimed'}) is None
     }
 
 
@@ -69,21 +72,23 @@ def get_nutaku_home(cookies, proxies, config):
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
     url = 'https://www.nutaku.net/rewards-calendar/redeem/'
-    Cookie = "NUTAKUID={}; Nutaku_TOKEN={}"
+    Cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = {
-        "Accept": "application/json, */*; q=0.01",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "x-csrf-token": html_data.get("csrf_token"),
+        "X-CSRF-TOKEN": html_data.get("csrf_token"),
         "User-Agent": UA,
         "Cookie": Cookie,
         'Origin': 'https://www.nutaku.net',
-        'Referer': 'https://www.nutaku.net/home/'
+        'Referer': 'https://www.nutaku.net/home/',
+        "X-Requested-With": "XMLHttpRequest",
+        'Host': 'www.nutaku.net'
     }
+
     data = "calendarId={}".format(html_data.get('calendar_id'))
 
-    logger.debug("headers->{}".format(headers))
     logger.debug("data->{}".format(data))
+    logger.debug("headers->{}".format(headers))
     timeout = config.get('settings', 'connection_timeout')
     headers['Cookie'] = Cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
     resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout))
@@ -128,7 +133,7 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
         send_email(config=config, data=data, logger=logger)
 
 
-def getting_rewards_handler(cookies, proxies, config, html_data):
+def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
     logger.debug("resp_data->{}".format(reward_resp_data))
@@ -138,7 +143,8 @@ def getting_rewards_handler(cookies, proxies, config, html_data):
     data = {
         'date': datetime.datetime.now().strftime('%Y-%m-%d'),
         'email': config.get('account', 'email'),
-        'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d')
+        'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
+        'limit_str': local_data.get('limit').strftime(DATE_FORMAT)
     }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
@@ -194,7 +200,7 @@ def login(config, cookies, proxies, csrf_token):
     return RuntimeError(fail_message2 + err_message)
 
 
-def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
+def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, local_data):
     login_resp = login(config=config, cookies=cookies, proxies=proxies, csrf_token=html_data.get("csrf_token"))
     try:
         resp_data = login_resp.json()
@@ -216,7 +222,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
                 return
             if html_data.get("calendar_id") is not None:
                 print(success_message)
-                getting_rewards_handler(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
+                getting_rewards_handler(cookies=cookies, html_data=html_data, proxies=proxies, config=config, local_data=local_data)
             else:
                 raise RuntimeError(fail_message2 + err_message)
         elif resp_data['status'] == 'error':
@@ -228,12 +234,16 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data):
         raise RuntimeError(fail_message2 + err_message)
 
 
-def redeem(config, clearing=False, local_data: dict = None):
-    if 'limit' not in local_data:
-        set_limit_time(local_data)
+def redeem(config, clearing=False, local_data: dict = None, reloading=False):
+    # 重新加载数据
+    if reloading:
+        local_data = load_data(config, logger)
+    set_limit_time(local_data)
     if clearing:
         clear(True)
     if not check(True, local_data):
+        global UA
+        UA = get_random_ua()
         cookie_file_path = config.get('sys', 'dir') + separator + 'cookies.json'
         # 尝试读取本地cookie文件
         local_cookies = {}
@@ -284,21 +294,24 @@ def redeem(config, clearing=False, local_data: dict = None):
                 print('---> 登陆账号.')
             # 登陆返回的cookie包含Nutaku_TOKEN
             logging_in_handler(config=config, cookies=merged, cookie_file_path=cookie_file_path,
-                               proxies=proxies, html_data=html_data)
+                               proxies=proxies, html_data=html_data, local_data=local_data)
         else:
             print(success_message)
-            getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config)
+            getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config, local_data=local_data)
 
 
-def listener(event, sd, conf, local_data: dict):
+def listener(event, sd, conf):
     if event.code == EVENT_JOB_EXECUTED:
         logger.debug("任务执行完成.")
         if event.job_id == '001' or event.job_id == '002':
-            local_data.pop('limit')
             exit_if_necessary(conf, logger)
     elif event.code == EVENT_JOB_ERROR:
         today = datetime.datetime.today()
-        limit = local_data.get('limit')
+        local_data = load_data(conf, logger)
+        limit_str = local_data.get('limit_str')
+        limit = None
+        if limit_str is not None:
+            limit = datetime.datetime.strptime(limit_str, DATE_FORMAT)
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         logger.debug("当前时间：{}".format(today))
@@ -307,7 +320,7 @@ def listener(event, sd, conf, local_data: dict):
         if retrying > 1:
             retrying -= 1
             conf.set('settings', 'retrying', str(retrying))
-            if next_time < limit:
+            if limit is None or next_time < limit:
                 print(f'---> 将会在{next_time}进行重试.')
                 sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
                            args=[conf, False, local_data],
@@ -333,12 +346,14 @@ def set_limit_time(local_data: dict):
     # limit是相对于today_000的时间
     today_000 = today.replace(hour=0, minute=0, second=0)
     limit = today_000 + datetime.timedelta(days=1, hours=8)
-    local_data['limit'] = limit
+    _limit = local_data.get("limit")
+    if _limit != limit:
+        local_data['limit'] = limit
 
 
-def wrapper(fn, sd, conf, local_data):
+def wrapper(fn, sd, conf):
     def inner(event):
-        return fn(event, sd, conf, local_data)
+        return fn(event, sd, conf)
 
     return inner
 
@@ -398,16 +413,12 @@ if __name__ == '__main__':
         logging.getLogger('apscheduler').setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
 
-    logger.debug("->加载本地数据.")
-    local_data = load_data(config, logger)
-    logger.debug("->{}".format(local_data))
-
     scheduler = BlockingScheduler()
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
 
-    scheduler.add_listener(wrapper(listener, scheduler, config, local_data), EVENT_ALL)
+    scheduler.add_listener(wrapper(listener, scheduler, config), EVENT_ALL)
     scheduler.add_job(id='001', func=redeem, **get_dict_params(mode, execution_time),
-                      args=[config, True, local_data],
+                      args=[config, True, None, True],
                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
 
     try:

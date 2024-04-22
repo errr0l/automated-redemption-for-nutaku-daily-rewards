@@ -43,8 +43,7 @@ def parse_html_for_data(html):
     return {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': calendar_id is not None and future_reward is None
-        and soup.find('div', {'class': 'reward-status-current-not-claimed'}) is None
+        'destination': calendar_id is not None and future_reward is None and soup.find('div', {'class': 'reward-status-current-not-claimed'}) is None
     }
 
 
@@ -222,7 +221,8 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
                 return
             if html_data.get("calendar_id") is not None:
                 print(success_message)
-                getting_rewards_handler(cookies=cookies, html_data=html_data, proxies=proxies, config=config, local_data=local_data)
+                getting_rewards_handler(cookies=cookies, html_data=html_data, proxies=proxies, config=config,
+                                        local_data=local_data)
             else:
                 raise RuntimeError(fail_message2 + err_message)
         elif resp_data['status'] == 'error':
@@ -297,7 +297,8 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
                                proxies=proxies, html_data=html_data, local_data=local_data)
         else:
             print(success_message)
-            getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config, local_data=local_data)
+            getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config,
+                                    local_data=local_data)
 
 
 def listener(event, sd, conf):
@@ -310,24 +311,32 @@ def listener(event, sd, conf):
         local_data = load_data(conf, logger)
         limit_str = local_data.get('limit_str')
         limit = None
+        # 限制时间是第二天的早上8点，因此，一般情况下limit和today不在同一天；而如果处于同一天时，说明limit还没更新（比如没有请求n站成功就进入了重试逻辑）
         if limit_str is not None:
             limit = datetime.datetime.strptime(limit_str, DATE_FORMAT)
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         logger.debug("当前时间：{}".format(today))
         logger.debug("截止日期：{}".format(limit))
-        retrying = int(conf.get('settings', 'retrying'))
-        if retrying > 1:
-            retrying -= 1
-            conf.set('settings', 'retrying', str(retrying))
-            if limit is None or next_time < limit:
+        _retrying = conf.get('settings', '_retrying')
+        if _retrying > 1:
+            _retrying -= 1
+            # conf.set('settings', '_retrying', _retrying)
+            setRetryingCopying(conf, _retrying)
+            if limit is None or next_time < limit or today.day == limit.day:
                 print(f'---> 将会在{next_time}进行重试.')
+                # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
+                if event.job_id == '001':
+                    job = sd.get_job('002')
+                    if job is not None:
+                        sd.remove_job('002')
                 sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
                            args=[conf, False, local_data],
                            misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
             else:
                 dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('---> {} 签到失败，已经逾期.'.format(dateFormat))
+                print('---> {} 签到失败，已到达最大重试次数.'.format(dateFormat))
+                setRetryingCopying(conf, int(conf.get('settings', 'retrying')))
                 exit_if_necessary(conf, logger)
         else:
             print('---> 已到达最大重试次数，将停止签到；如本日签到还未完成时，请手动签到.')
@@ -395,6 +404,10 @@ def jobs_checker(sc):
         sc.wakeup()
 
 
+def setRetryingCopying(conf, value):
+    conf.set('settings', '_retrying', value)
+
+
 """
 todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要调用对应的接口（are you over 18 years old？）；
 """
@@ -406,6 +419,7 @@ if __name__ == '__main__':
     config = get_config(current_dir, logger)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
+    setRetryingCopying(config, int(config.get('settings', 'retrying')))
     print(success_message)
     mode = config.get('settings', 'execution_mode')
     if config.get('settings', 'debug') == 'on':

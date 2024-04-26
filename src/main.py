@@ -318,12 +318,15 @@ def listener(event, sd, conf):
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         logger.debug("当前时间：{}".format(today))
         logger.debug("截止日期：{}".format(limit))
+        matched = today.day == limit.day
+        if matched:
+            logger.debug("截止日期未更新")
         _retrying = conf.get('settings', '_retrying')
         if _retrying > 1:
             _retrying -= 1
             # conf.set('settings', '_retrying', _retrying)
             setRetryingCopying(conf, _retrying)
-            if limit is None or next_time < limit or today.day == limit.day:
+            if limit is None or next_time < limit or matched:
                 print(f'---> 将会在{next_time}进行重试.')
                 # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
                 if event.job_id == '001':

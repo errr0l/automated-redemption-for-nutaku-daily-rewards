@@ -1,12 +1,9 @@
-from http.client import RemoteDisconnected
-
 import requests
-# import logging
-# import sys
-# import os
-# import json
-# from src.util.common import get_config
-from requests import ConnectTimeout
+import logging
+import sys
+import os
+import json
+from src.util.common import get_config
 
 
 def send_email(config, data: dict, logger=None):
@@ -26,23 +23,29 @@ def send_email(config, data: dict, logger=None):
     try:
         resp = requests.post(url=f'{base_url}email/notification',
                              json=data, headers=headers, timeout=int(timeout))
+
         logger.debug(f'resp_text: {resp.text}')
-        resp_data = resp.json()
-        if resp_data.get('code') == 0:
-            logger.debug("已成功发送邮件.")
+        if resp.status_code == 200:
+            resp_data = resp.json()
+            if resp_data.get('code') == 0:
+                logger.debug("已成功发送邮件.")
+            else:
+                logger.debug(f"发送邮件失败->{resp_data.get('message')}")
         else:
-            logger.debug(f"发送邮件失败->{resp_data.get('message')}")
-    except (RemoteDisconnected, ConnectionError, ConnectTimeout, TimeoutError) as e:
+            logger.debug(f"发送邮件失败")
+    except Exception as e:
         logger.debug(f"发送邮件失败，捕获异常->{e}")
 
-# if __name__ == '__main__':
-#     current_dir = os.path.dirname(sys.argv[0])
-#     print('---> 当前目录为：' + current_dir)
-#     print('---> 读取配置文件.')
-#     config = get_config(current_dir + '/../')
-#     logging.basicConfig()
-#     logger = logging.getLogger(__name__)
-#     logger.setLevel(logging.DEBUG)
-#     with open('../../dist/data.json', 'r') as file:
-#         data = json.load(file)
-#         send_email(config, data=data, logger=logger)
+
+if __name__ == '__main__':
+    current_dir = os.path.dirname(sys.argv[0])
+    print('---> 当前目录为：' + current_dir)
+    print('---> 读取配置文件.')
+
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    config = get_config(current_dir + '/../', logger=logger)
+    with open('../data.json', 'r') as file:
+        data = json.load(file)
+        send_email(config, data=data, logger=logger)

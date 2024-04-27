@@ -17,9 +17,14 @@ nutaku金币活动自动签到脚本。
 email=你的账号
 password=你的密码
 
-# 代理（梯子）
+# 网络设置
 [network]
-proxy=127.0.0.1:7890
+# 代理&梯子（on=启用；off=关闭）
+proxy=off
+# 请求"http"时使用的代理
+http=http://127.0.0.1:7890
+# 请求"https"时使用的代理
+https=http://127.0.0.1:7890
 
 # 其他设置
 [settings]
@@ -49,7 +54,7 @@ connection_timeout=30
 
 > python src/main.py
 
-打包后再运行也ok。
+打包后再运行也ok，亦或是下载最新的[发布版](https://github.com/xxzhiwei/automated-redemption-for-nutaku-daily-rewards/releases)。
 
 ## 打包
 
@@ -69,4 +74,18 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 
 > pip3 install -r requirements.txt
 
-*本程序不会收集任何与账号有关的信息，但会发送邮件通知时，需要使用到当前邮箱（如果已开启了的话）。*
+## 更新日志
+
+2024-04
+
+1. 处理了首次请求页面失败，进入重试流程时，时间判断不正确的问题
+
+2024-02
+
+1. 修复了windows系统下，无法正确读取文件的问题
+2. 修复了无法进行最后一次签到的问题
+3. 修复了签到领取物件时，非金币而导致读取数据错误的问题
+
+***
+
+*再次声明，本程序不会收集&存储任何与账号相关的数据。*

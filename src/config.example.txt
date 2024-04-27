@@ -4,9 +4,14 @@
 email=你的账号
 password=你的密码
 
-# 代理（梯子）
+# 网络设置
 [network]
-proxy=127.0.0.1:7890
+# 代理&梯子（on=启用；off=关闭）
+proxy=off
+# 请求"http"时使用的代理
+http=http://127.0.0.1:7890
+# 请求"https"时使用的代理
+https=http://127.0.0.1:7890
 
 # 其他设置
 [settings]

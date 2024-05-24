@@ -7,11 +7,8 @@ password=你的密码
 # 网络设置
 [network]
 # 代理&梯子（on=启用；off=关闭）
+# 自动使用系统代理
 proxy=off
-# 请求"http"时使用的代理
-http=http://127.0.0.1:7890
-# 请求"https"时使用的代理
-https=http://127.0.0.1:7890
 
 # 其他设置
 [settings]
@@ -22,6 +19,8 @@ debug=on
 # 邮箱通知；以当前账号为准（on=启用；off=关闭）
 email_notification=on
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
+# 邮件通知地址
+email_notification_url=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
 retrying=5
 # 重试间隔（单位，分钟）
 retrying_interval=10

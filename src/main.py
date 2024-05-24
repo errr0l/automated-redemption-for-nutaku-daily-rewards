@@ -95,14 +95,16 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
     status_code = resp.status_code
-    if status_code == 422:
-        resp_data = resp.json()
-        msg = resp_data.get('message')
-        # 未知原因，需要重试
-        if msg == "Couldn't identify reward":
-            raise RuntimeError(fail_message2 + msg)
-        resp_data['code'] = status_code
-        return resp_data
+    # if status_code == 422:
+    #     resp_data = resp.json()
+    #     msg = resp_data.get('message')
+    #     # 未知原因，需要重试
+    #     if msg == "Couldn't identify reward":
+    #         raise RuntimeError(fail_message2 + msg)
+    #     resp_data['code'] = status_code
+    #     return resp_data
+    # 20240511更新：如果状态码不为200，则当做错误处理，以覆盖首次签到失败后（概率失败），后续不再进行签到的问题；
+    # 会有一种很极端的情况，如用户当天手动签到后，程序会一直报错，直至最大重试次数；（没办法，服务器又不返回特定的状态码）
     if status_code == 200:
         try:
             return resp.json()
@@ -269,10 +271,13 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
             print('---> 本地cookie不存在.')
 
         proxies = {}
-        if config.get('network', 'proxy') == 'on':
-            proxies['http'] = config.get('network', 'http')
-            proxies['https'] = config.get('network', 'https')
-            logger.debug("启用代理->{}".format(proxies))
+        if config.get('network', 'proxy') == 'off':
+            logger.debug("绕过代理->{}".format(proxies))
+            # 可以这样设置是因为，当前所有的接口都是该域名下的
+            proxies['no_proxy'] = 'nutaku.net'
+        # 默认情况下，请求时会自动应用代理
+        else:
+            logger.debug("启用代理（系统代理）")
         print('---> 请求nutaku主页.')
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
@@ -321,11 +326,11 @@ def listener(event, sd, conf):
         matched = today.day == limit.day
         if matched:
             logger.debug("截止日期未更新")
-        _retrying = conf.get('settings', '_retrying')
+        _retrying = int(conf.get('settings', '_retrying'))
         if _retrying > 1:
             _retrying -= 1
             # conf.set('settings', '_retrying', _retrying)
-            setRetryingCopying(conf, _retrying)
+            setRetryingCopying(conf, str(_retrying))
             if limit is None or next_time < limit or matched:
                 print(f'---> 将会在{next_time}进行重试.')
                 # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
@@ -338,8 +343,8 @@ def listener(event, sd, conf):
                            misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
             else:
                 dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('---> {} 签到失败，已到达最大重试次数.'.format(dateFormat))
-                setRetryingCopying(conf, int(conf.get('settings', 'retrying')))
+                print('---> {} 签到失败.'.format(dateFormat))
+                setRetryingCopying(conf, conf.get('settings', 'retrying'))
                 exit_if_necessary(conf, logger)
         else:
             print('---> 已到达最大重试次数，将停止签到；如本日签到还未完成时，请手动签到.')
@@ -422,7 +427,7 @@ if __name__ == '__main__':
     config = get_config(current_dir, logger)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
-    setRetryingCopying(config, int(config.get('settings', 'retrying')))
+    setRetryingCopying(config, config.get('settings', 'retrying'))
     print(success_message)
     mode = config.get('settings', 'execution_mode')
     if config.get('settings', 'debug') == 'on':

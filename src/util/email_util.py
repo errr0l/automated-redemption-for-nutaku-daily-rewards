@@ -16,12 +16,10 @@ def send_email(config, data: dict, logger=None):
     headers = {'Content-Type': 'application/json'}
     logger.debug(f'data: {data}')
     logger.debug(f'headers: {headers}')
-    base_url = 'http://errol.shenzhuo.vip:26107/api/easyshop/portal/'
-    # base_url = 'http://127.0.0.1:8082/api/'
     # 超时不管【日常大姨妈】
     timeout = config.get('settings', 'connection_timeout')
     try:
-        resp = requests.post(url=f'{base_url}email/notification',
+        resp = requests.post(url=f'{config.get("settings", "email_notification_url")}',
                              json=data, headers=headers, timeout=int(timeout))
 
         logger.debug(f'resp_text: {resp.text}')

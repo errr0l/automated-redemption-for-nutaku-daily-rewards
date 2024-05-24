@@ -271,10 +271,13 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
             print('---> 本地cookie不存在.')
 
         proxies = {}
-        if config.get('network', 'proxy') == 'on':
-            proxies['http'] = config.get('network', 'http')
-            proxies['https'] = config.get('network', 'https')
-            logger.debug("启用代理->{}".format(proxies))
+        if config.get('network', 'proxy') == 'off':
+            logger.debug("绕过代理->{}".format(proxies))
+            # 可以这样设置是因为，当前所有的接口都是该域名下的
+            proxies['no_proxy'] = 'nutaku.net'
+        # 默认情况下，请求时会自动应用代理
+        else:
+            logger.debug("启用代理（系统代理）")
         print('---> 请求nutaku主页.')
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
@@ -340,7 +343,7 @@ def listener(event, sd, conf):
                            misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
             else:
                 dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('---> {} 签到失败，已到达最大重试次数.'.format(dateFormat))
+                print('---> {} 签到失败.'.format(dateFormat))
                 setRetryingCopying(conf, conf.get('settings', 'retrying'))
                 exit_if_necessary(conf, logger)
         else:

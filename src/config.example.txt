@@ -19,8 +19,6 @@ debug=on
 # 邮箱通知；以当前账号为准（on=启用；off=关闭）
 email_notification=on
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
-# 邮件通知地址
-email_notification_url=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
 retrying=5
 # 重试间隔（单位，分钟）
 retrying_interval=10
@@ -34,3 +32,10 @@ misfire_grace_time=600
 execution_mode=1
 # 连接超时时间（单位，秒）
 connection_timeout=30
+
+# 接口路径
+[api]
+# 签到接口
+redeem=/rewards-calendar/rewards-calendar/redeem/
+# 邮件通知接口
+email_notification=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification

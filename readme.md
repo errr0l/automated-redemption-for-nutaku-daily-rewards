@@ -21,10 +21,6 @@ password=你的密码
 [network]
 # 代理&梯子（on=启用；off=关闭）
 proxy=off
-# 请求"http"时使用的代理
-http=http://127.0.0.1:7890
-# 请求"https"时使用的代理
-https=http://127.0.0.1:7890
 
 # 其他设置
 [settings]
@@ -60,9 +56,9 @@ connection_timeout=30
 
 将项目打包为可执行文件，以脱离python环境运行（指的是不需要安装python及其依赖）。
 
-pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只能打包为mac的可执行文件，此外还要保证pyinstaller已经添加到系统路径中。
+pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只能打包为mac的可执行文件。
 
-> pyinstaller main.spec
+> python -m PyInstaller main.spec
 
 ## 项目依赖
 
@@ -78,8 +74,8 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 
 2024-05
 
-1、处理了请求时自动应用系统代理（导致SSLError）的问题
-2、配置文件移除了服务器代理地址（默认情况下，会自动读取系统代理）
+1. 处理了请求时自动应用系统代理（导致SSLError）的问题
+2. 配置文件移除了服务器代理地址（默认情况下，会自动读取系统代理）
 
 2024-04
 

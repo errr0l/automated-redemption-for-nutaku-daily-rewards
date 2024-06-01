@@ -70,7 +70,8 @@ def get_nutaku_home(cookies, proxies, config):
 
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
-    url = 'https://www.nutaku.net/rewards-calendar/redeem/'
+    # url = 'https://www.nutaku.net/rewards-calendar/redeem/'
+    url = f'https://www.nutaku.net{config.get("api", "redeem")}'
     Cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -272,9 +273,9 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
 
         proxies = {}
         if config.get('network', 'proxy') == 'off':
-            logger.debug("绕过代理->{}".format(proxies))
             # 可以这样设置是因为，当前所有的接口都是该域名下的
             proxies['no_proxy'] = 'nutaku.net'
+            logger.debug("绕过代理->{}".format(proxies))
         # 默认情况下，请求时会自动应用代理
         else:
             logger.debug("启用代理（系统代理）")

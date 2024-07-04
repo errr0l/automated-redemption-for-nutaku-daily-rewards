@@ -60,7 +60,8 @@ def get_nutaku_home(cookies, proxies, config):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    logger.debug("headers->{}".format(headers | COOKIE))
+    # logger.debug("headers->{}".format(headers | COOKIE))
+    logger.debug("headers->{}".format({**headers, **COOKIE}))
     timeout = config.get('settings', 'connection_timeout')
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout))
     if resp.status_code == 200:
@@ -96,16 +97,6 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
     status_code = resp.status_code
-    # if status_code == 422:
-    #     resp_data = resp.json()
-    #     msg = resp_data.get('message')
-    #     # 未知原因，需要重试
-    #     if msg == "Couldn't identify reward":
-    #         raise RuntimeError(fail_message2 + msg)
-    #     resp_data['code'] = status_code
-    #     return resp_data
-    # 20240511更新：如果状态码不为200，则当做错误处理，以覆盖首次签到失败后（概率失败），后续不再进行签到的问题；
-    # 会有一种很极端的情况，如用户当天手动签到后，程序会一直报错，直至最大重试次数；（没办法，服务器又不返回特定的状态码）
     if status_code == 200:
         try:
             return resp.json()
@@ -155,6 +146,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         print(success_message)
         reward_resp_data_handler(reward_resp_data, data)
 
+    setRetryingCopying(config, config.get('settings', 'retrying'))
     # 创建文件
     if os.path.exists(data_file_path) is False:
         with open(data_file_path, 'w'):
@@ -163,7 +155,8 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     with open(data_file_path, 'r+') as _file:
         json_str = _file.read()
         is_not_empty = len(json_str) > 0
-        merged = (json.loads(json_str) if is_not_empty else {}) | data
+        # merged = (json.loads(json_str) if is_not_empty else {}) | data
+        merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
         # 清空文件内容，再重新写入
         if is_not_empty:
             _file.seek(0)
@@ -213,9 +206,11 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
                 json.dump(login_cookies, _file)
             print(success_message)
             print('---> 重新请求nutaku主页，并获取calendar_id.')
-            cookies = cookies | login_cookies
+            # cookies = cookies | login_cookies
+            cookies = {**cookies, **login_cookies}
             home_resp = get_nutaku_home(cookies=cookies, proxies=proxies, config=config)
-            cookies = cookies | home_resp.cookies.get_dict()
+            # cookies = cookies | home_resp.cookies.get_dict()
+            cookies = {**cookies, **home_resp.cookies.get_dict()}
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
@@ -282,7 +277,8 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
         print('---> 请求nutaku主页.')
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
-        merged = local_cookies | home_resp.cookies.get_dict()
+        # merged = local_cookies | home_resp.cookies.get_dict()
+        merged = {**local_cookies, **home_resp.cookies.get_dict()}
         print(success_message)
         print('---> 获取calendar_id与csrf_token.')
         html_data = parse_html_for_data(home_resp.text)

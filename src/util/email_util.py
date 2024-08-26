@@ -19,7 +19,7 @@ def send_email(config, data: dict, logger=None):
     # 超时不管【日常大姨妈】
     timeout = config.get('settings', 'connection_timeout')
     try:
-        resp = requests.post(url=f'{config.get("settings", "email_notification_url")}',
+        resp = requests.post(url=f'{config.get("api", "email_notification")}',
                              json=data, headers=headers, timeout=int(timeout))
 
         logger.debug(f'resp_text: {resp.text}')

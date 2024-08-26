@@ -38,13 +38,24 @@ def parse_html_for_data(html):
     meta_ele = soup.find('meta', {'name': 'csrf-token'})
     # 表示是否已经全部签到完成（无可再签）
     calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
-    # current_reward = soup.find('div', {'class': 'reward-status-current-not-claimed'})
     future_reward = soup.find('div', {'class': 'reward-status-future'})
-    return {
+    _d = {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': calendar_id is not None and future_reward is None and soup.find('div', {'class': 'reward-status-current-not-claimed'}) is None
+        'destination': None,
+        'gold': 0
     }
+    if calendar_id is not None:
+        if future_reward is None:
+            _d['destination'] = rewards_calendar_ele.find('div', {'class': 'reward-status-current-not-claimed'}) is None
+        # 有可能是金币或优惠卷
+        reward = rewards_calendar_ele.find('div', class_='reward-status-current-not-claimed')
+        if reward is None:
+            reward = future_reward.find_previous_sibling('div')
+        reward_text = reward.div.span.text
+        if 'Gold' in reward_text:
+            _d['gold'] = reward_text.replace("Gold", "").strip()
+    return _d
 
 
 # 获取网站主页
@@ -60,9 +71,10 @@ def get_nutaku_home(cookies, proxies, config):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    logger.debug("headers->{}".format(headers | COOKIE))
+    # logger.debug("headers->{}".format(headers | COOKIE))
+    logger.debug("headers->{}".format({**headers, **COOKIE}))
     timeout = config.get('settings', 'connection_timeout')
-    resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout))
+    resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout), verify=False)
     if resp.status_code == 200:
         return resp
     raise RuntimeError(fail_message2 + err_message)
@@ -70,14 +82,14 @@ def get_nutaku_home(cookies, proxies, config):
 
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
-    url = 'https://www.nutaku.net/rewards-calendar/redeem/'
-    Cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
+    url = f'https://www.nutaku.net{config.get("api", "redeem")}'
+    _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-CSRF-TOKEN": html_data.get("csrf_token"),
         "User-Agent": UA,
-        "Cookie": Cookie,
+        "Cookie": _cookie,
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/',
         "X-Requested-With": "XMLHttpRequest",
@@ -89,22 +101,12 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("data->{}".format(data))
     logger.debug("headers->{}".format(headers))
     timeout = config.get('settings', 'connection_timeout')
-    headers['Cookie'] = Cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout))
+    headers['Cookie'] = _cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
+    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
     # 请求成功时，将会返回{"userGold": "1"}
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
     status_code = resp.status_code
-    # if status_code == 422:
-    #     resp_data = resp.json()
-    #     msg = resp_data.get('message')
-    #     # 未知原因，需要重试
-    #     if msg == "Couldn't identify reward":
-    #         raise RuntimeError(fail_message2 + msg)
-    #     resp_data['code'] = status_code
-    #     return resp_data
-    # 20240511更新：如果状态码不为200，则当做错误处理，以覆盖首次签到失败后（概率失败），后续不再进行签到的问题；
-    # 会有一种很极端的情况，如用户当天手动签到后，程序会一直报错，直至最大重试次数；（没办法，服务器又不返回特定的状态码）
     if status_code == 200:
         try:
             return resp.json()
@@ -118,13 +120,16 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
     item = resp_data.get('userGold')
     _content = "当前签到物件为未知物件"
     if item is not None:
-        print("---> 当前金币为：" + item + "\n")
-        _content = f'当前账号金币为：{item}'
+        _date = datetime.datetime.today().strftime("%Y-%m")
+        # 获取本月金币
+        monthly_amount = data.get(_date)
+        data[_date] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get('current_gold')
+        print(f"---> 当前金币为：{item}，本月累计金币为：{data[_date]}\n")
+        _content = f'当前账号金币为：{item}，本月累计金币为：{data[_date]}'
         data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
         item = resp_data.get('coupon')
         _content = "获取到优惠卷：{}/{}".format(item.get('title'), item.get('code'))
-        # print("---> 当前签到物件为优惠卷：" + item + "\n")
         print("---> " + _content + "\n")
     else:
         print("---> " + _content + "\n")
@@ -145,7 +150,9 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         'date': datetime.datetime.now().strftime('%Y-%m-%d'),
         'email': config.get('account', 'email'),
         'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
-        'limit_str': local_data.get('limit').strftime(DATE_FORMAT)
+        **local_data,
+        'limit_str': local_data.get('limit').strftime(DATE_FORMAT),
+        'current_gold': html_data.get('gold')
     }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
@@ -162,7 +169,8 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     with open(data_file_path, 'r+') as _file:
         json_str = _file.read()
         is_not_empty = len(json_str) > 0
-        merged = (json.loads(json_str) if is_not_empty else {}) | data
+        # merged = (json.loads(json_str) if is_not_empty else {}) | data
+        merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
         # 清空文件内容，再重新写入
         if is_not_empty:
             _file.seek(0)
@@ -193,7 +201,7 @@ def login(config, cookies, proxies, csrf_token):
     timeout = config.get('settings', 'connection_timeout')
     resp = requests.post(url, headers=headers,
                          data=data.format(config.get('account', 'email'), config.get('account', 'password')),
-                         proxies=proxies, timeout=int(timeout))
+                         proxies=proxies, timeout=int(timeout), verify=False)
     # 返回的是一个重定向链接，token是在cookie中
     # {"redirectURL":"https:\/\/www.nutaku.net\/home"}
     if resp.status_code == 200:
@@ -212,9 +220,11 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
                 json.dump(login_cookies, _file)
             print(success_message)
             print('---> 重新请求nutaku主页，并获取calendar_id.')
-            cookies = cookies | login_cookies
+            # cookies = cookies | login_cookies
+            cookies = {**cookies, **login_cookies}
             home_resp = get_nutaku_home(cookies=cookies, proxies=proxies, config=config)
-            cookies = cookies | home_resp.cookies.get_dict()
+            # cookies = cookies | home_resp.cookies.get_dict()
+            cookies = {**cookies, **home_resp.cookies.get_dict()}
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
@@ -272,16 +282,17 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
 
         proxies = {}
         if config.get('network', 'proxy') == 'off':
-            logger.debug("绕过代理->{}".format(proxies))
             # 可以这样设置是因为，当前所有的接口都是该域名下的
             proxies['no_proxy'] = 'nutaku.net'
+            logger.debug("绕过代理->{}".format(proxies))
         # 默认情况下，请求时会自动应用代理
         else:
             logger.debug("启用代理（系统代理）")
         print('---> 请求nutaku主页.')
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
-        merged = local_cookies | home_resp.cookies.get_dict()
+        # merged = local_cookies | home_resp.cookies.get_dict()
+        merged = {**local_cookies, **home_resp.cookies.get_dict()}
         print(success_message)
         print('---> 获取calendar_id与csrf_token.')
         html_data = parse_html_for_data(home_resp.text)
@@ -315,36 +326,38 @@ def listener(event, sd, conf):
         today = datetime.datetime.today()
         local_data = load_data(conf, logger)
         limit_str = local_data.get('limit_str')
-        limit = None
+        # limit = None
         # 限制时间是第二天的早上8点，因此，一般情况下limit和today不在同一天；而如果处于同一天时，说明limit还没更新（比如没有请求n站成功就进入了重试逻辑）
-        if limit_str is not None:
-            limit = datetime.datetime.strptime(limit_str, DATE_FORMAT)
+        # if limit_str is not None:
+        limit = datetime.datetime.strptime(limit_str, DATE_FORMAT) if limit_str is not None else today
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
         logger.debug("当前时间：{}".format(today))
         logger.debug("截止日期：{}".format(limit))
-        matched = today.day == limit.day
+        matched = today.day == limit.day if limit is not None else False
+        is_job_001 = event.job_id == '001'
+        if is_job_001:
+            set_retrying_copying(conf, conf.get('settings', 'retrying'))
         if matched:
             logger.debug("截止日期未更新")
         _retrying = int(conf.get('settings', '_retrying'))
         if _retrying > 1:
             _retrying -= 1
             # conf.set('settings', '_retrying', _retrying)
-            setRetryingCopying(conf, str(_retrying))
+            set_retrying_copying(conf, str(_retrying))
             if limit is None or next_time < limit or matched:
                 print(f'---> 将会在{next_time}进行重试.')
                 # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
-                if event.job_id == '001':
+                if is_job_001:
                     job = sd.get_job('002')
                     if job is not None:
                         sd.remove_job('002')
                 sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
                            args=[conf, False, local_data],
-                           misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+                           misfire_grace_time=conf.getint('settings', 'misfire_grace_time') * 60)
             else:
-                dateFormat = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('---> {} 签到失败.'.format(dateFormat))
-                setRetryingCopying(conf, conf.get('settings', 'retrying'))
+                date_format = '{}-{}-{}'.format(today.year, today.month, today.day)
+                print('---> {} 签到失败.'.format(date_format))
                 exit_if_necessary(conf, logger)
         else:
             print('---> 已到达最大重试次数，将停止签到；如本日签到还未完成时，请手动签到.')
@@ -371,7 +384,6 @@ def set_limit_time(local_data: dict):
 def wrapper(fn, sd, conf):
     def inner(event):
         return fn(event, sd, conf)
-
     return inner
 
 
@@ -412,13 +424,10 @@ def jobs_checker(sc):
         sc.wakeup()
 
 
-def setRetryingCopying(conf, value):
+def set_retrying_copying(conf, value):
     conf.set('settings', '_retrying', value)
 
 
-"""
-todo：1、Nutaku_ageGateCheck是秒数，如果到期了，那估计还需要调用对应的接口（are you over 18 years old？）；
-"""
 if __name__ == '__main__':
     clear(True)
     current_dir = os.path.dirname(sys.argv[0])
@@ -427,7 +436,7 @@ if __name__ == '__main__':
     config = get_config(current_dir, logger)
     config.add_section('sys')
     config.set('sys', 'dir', current_dir)
-    setRetryingCopying(config, config.get('settings', 'retrying'))
+    set_retrying_copying(config, config.get('settings', 'retrying'))
     print(success_message)
     mode = config.get('settings', 'execution_mode')
     if config.get('settings', 'debug') == 'on':

@@ -44,6 +44,13 @@ misfire_grace_time=600
 execution_mode=1
 # 连接超时时间（单位，秒）
 connection_timeout=30
+
+# 接口路径
+[api]
+# 签到接口
+#redeem=/rewards-calendar/rewards-calendar/redeem/
+# 邮件通知接口
+email_notification=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
 ```
 
 ## 运行
@@ -75,6 +82,7 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 2024-08
 
 1. 新增了每月领取金币的统计
+2. 签到接口更改为动态获取
 
 2024-07
 

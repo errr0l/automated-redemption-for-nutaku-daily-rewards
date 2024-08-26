@@ -43,7 +43,7 @@ def parse_html_for_data(html):
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
         'destination': None,
-        'gold': 0
+        'gold': 0, 'url': ''
     }
     if calendar_id is not None:
         if future_reward is None:
@@ -55,6 +55,7 @@ def parse_html_for_data(html):
         reward_text = reward.div.span.text
         if 'Gold' in reward_text:
             _d['gold'] = reward_text.replace("Gold", "").strip()
+        _d['url'] = reward.attrs['data-link']
     return _d
 
 
@@ -82,7 +83,7 @@ def get_nutaku_home(cookies, proxies, config):
 
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
-    url = f'https://www.nutaku.net{config.get("api", "redeem")}'
+    # url = f'https://www.nutaku.net{config.get("api", "redeem")}'
     _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -102,7 +103,7 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("headers->{}".format(headers))
     timeout = config.get('settings', 'connection_timeout')
     headers['Cookie'] = _cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
+    resp = requests.post(html_data.get('url'), headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
     # 请求成功时，将会返回{"userGold": "1"}
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))

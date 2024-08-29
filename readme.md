@@ -47,8 +47,6 @@ connection_timeout=30
 
 # 接口路径
 [api]
-# 签到接口
-#redeem=/rewards-calendar/rewards-calendar/redeem/
 # 邮件通知接口
 email_notification=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
 ```
@@ -83,6 +81,7 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 
 1. 新增了每月领取金币的统计
 2. 签到接口更改为动态获取
+3. 邮箱通知时机更改为签到完成后
 
 2024-07
 

@@ -42,19 +42,20 @@ def parse_html_for_data(html):
     _d = {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': None,
+        'destination': False,
         'gold': 0, 'url': ''
     }
     if calendar_id is not None:
-        if future_reward is None:
-            _d['destination'] = rewards_calendar_ele.find('div', {'class': 'reward-status-current-not-claimed'}) is None
         # 有可能是金币或优惠卷
         reward = rewards_calendar_ele.find('div', class_='reward-status-current-not-claimed')
-        if reward is None:
-            reward = future_reward.find_previous_sibling('div')
-        reward_text = reward.div.span.text
-        if 'Gold' in reward_text:
-            _d['gold'] = reward_text.replace("Gold", "").strip()
+        if future_reward is None:
+            _d['destination'] = reward is None
+        if _d['destination'] is False:
+            if reward is None:
+                reward = future_reward.find_previous_sibling('div')
+            reward_text = reward.div.span.text
+            if 'Gold' in reward_text:
+                _d['gold'] = reward_text.replace("Gold", "").strip()
         _d['url'] = reward.attrs['data-link']
     return _d
 
@@ -72,7 +73,6 @@ def get_nutaku_home(cookies, proxies, config):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    # logger.debug("headers->{}".format(headers | COOKIE))
     logger.debug("headers->{}".format({**headers, **COOKIE}))
     timeout = config.get('settings', 'connection_timeout')
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout), verify=False)
@@ -103,7 +103,6 @@ def get_rewards(cookies, html_data, proxies, config):
     timeout = config.get('settings', 'connection_timeout')
     headers['Cookie'] = _cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
     resp = requests.post(html_data.get('url'), headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
-    # 请求成功时，将会返回{"userGold": "1"}
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
     status_code = resp.status_code
@@ -327,9 +326,7 @@ def listener(event, sd, conf):
         today = datetime.datetime.today()
         local_data = load_data(conf, logger)
         limit_str = local_data.get('limit_str')
-        # limit = None
         # 限制时间是第二天的早上8点，因此，一般情况下limit和today不在同一天；而如果处于同一天时，说明limit还没更新（比如没有请求n站成功就进入了重试逻辑）
-        # if limit_str is not None:
         limit = datetime.datetime.strptime(limit_str, DATE_FORMAT) if limit_str is not None else today
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
@@ -344,7 +341,6 @@ def listener(event, sd, conf):
         _retrying = int(conf.get('settings', '_retrying'))
         if _retrying > 1:
             _retrying -= 1
-            # conf.set('settings', '_retrying', _retrying)
             set_retrying_copying(conf, str(_retrying))
             if limit is None or next_time < limit or matched:
                 print(f'---> 将会在{next_time}进行重试.')
@@ -415,7 +411,7 @@ def get_dict_params(mode, execution_time):
     return params
 
 
-# 使用额外线程，每30分钟唤醒一次scheduler
+# 使用额外线程，每隔段时间唤醒scheduler
 def jobs_checker(sc):
     while True:
         logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime(DATE_FORMAT)))

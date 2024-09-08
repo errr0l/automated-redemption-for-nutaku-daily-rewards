@@ -1,93 +1,84 @@
-
-import os
-import platform
-import shutil
-import sys
-import datetime
-
-from bs4 import BeautifulSoup
-
-
-# def parse_html_for_data(html):
-#     soup = BeautifulSoup(html, 'html.parser')
-#     rewards_calendar_ele = soup.find('section', {'class': 'js-rewards-calendar'})
+# import datetime
+# import json
+# import os
+# import threading
+# import time
+# # from ..main import redeem
 #
-#     meta_ele = soup.find('meta', {'name': 'csrf-token'})
-#     # 表示是否已经全部签到完成（无可再签）
-#     calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
-#     # current_reward = soup.find('div', {'class': 'reward-status-current-not-claimed'})
-#     # reward-status-current-claimed
-#     future_reward = soup.find('div', {'class': 'reward-status-future'})
-#     # 有可能是金币或优惠卷
-#     reward = soup.find('div', class_='reward-status-current-not-claimed')
-#     print('1')
-#     print(reward)
-#     if reward is None:
-#         reward = future_reward.find_previous_sibling('div')
-#         print('2')
-#         print(reward)
-#     reward = reward.div.span.text
 #
-#     return {
-#         'csrf_token': meta_ele.attrs['content'],
-#         'calendar_id': calendar_id,
-#         'destination': calendar_id is not None and future_reward is None and soup.find('div', {'class': 'reward-status-current-not-claimed'}) is None,
-#         'gold': reward.replace("Gold", "").strip() if 'Gold' in reward else 0,
+# def p(event):
+#     while not event.is_set():
+#         print(1)
+#         time.sleep(5)
+#     print('over')
+#
+#
+# def reward_resp_data_handler(resp_data: dict, data: dict):
+#     item = resp_data.get('userGold')
+#     _content = "当前签到物件为未知物件"
+#     if item is not None:
+#         # 获取本月金币
+#         month = data.get('month')
+#         monthly_amount = data.get(month)
+#         print("monthly_amount")
+#         print(monthly_amount)
+#         data[month] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get('current_gold')
+#         print(f"---> 当前金币为：{item}，本月累计金币为：{data[month]}\n")
+#         _content = f'当前账号金币为：{item}，本月累计金币为：{data[month]}'
+#         data['user_gold'] = item
+#     data['content'] = _content
+#
+#
+# def getting_rewards_handler():
+#     print('---> 开始签到.')
+#     # reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
+#     # logger.debug("resp_data->{}".format(reward_resp_data))
+#     # status_code = reward_resp_data.get('code')
+#
+#     # data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+#     _date = datetime.datetime.today().strftime("%Y-%m")
+#     data = {'date': '2024-09-08', 'email': 'err0l@qq.com', 'month': '2024-09', 'current_gold': 10, _date: '111'}
+#     reward_resp_data = {
+#         "userGold": "5",
 #     }
-
-
-if __name__ == '__main__':
-    # with open('../home.html') as _f:
-    #     _home = _f.read()
-    #     r = parse_html_for_data(_home)
-    #     print(r)
-    # _system = platform.system()
-    # current_dir = os.getcwd()
-    # config_path = '\src\config.txt' if _platform == 'Windows' else '/src/config.txt'
-
-    # _split = "\\" if _system == 'Windows' else '/'
-    # path = ['', 'src', 'config.txt']
-    # output_path = ['dist', 'config.txt']
-
-    # shutil.copyfile(_split.join(paths), '{0}{1}{2}'.format(_split, _split, paths[1]))
-    # print(_split.join(path))
-    # print(_split.join(output_path))
-    # DISTPATH = "dist"
-    # shutil.copyfile(current_dir + _split.join(path), '{0}{1}config.txt'.format(DISTPATH, _split))
-    # print(current_dir + _split.join(path))
-    # print('{0}{1}{2}'.format(DISTPATH, _split, path[2]))
-    # now = datetime.datetime.utcnow().strftime('%Y-%m-%d')
-    # print(now)
-    # tomorrow = datetime.timedelta(hours=8)
-    # print(1)
-    # today = datetime.datetime.today()
-    # print(today)
-    # current = datetime.datetime.now()
-    # print(current)
-    # print(current + tomorrow)
-    # # print(tomorrow.total_seconds())
-    # print(current < (datetime.datetime.now() + tomorrow))
-    # print(tomorrow + today)
-    # today_000 = today.replace(hour=0, minute=0, second=0)
-    #
-    # limit = today_000 + datetime.timedelta(days=1, hours=8)
-    # t1 = {'a': limit, 'abc': '123'}
-    # print(t1)
-    # print(t1.get('a'))
-    # t1.pop('abc')
-    # print('abc' not in t1)
-    # limit_str = "2024-03-08 12:30:33"
-    # a = datetime.datetime.strptime(limit_str, "%Y-%m-%d %H:%M:%S")
-    # print(a)
-    # t1['b'] = a
-    # print(t1)
-    # print(today)
-    # print(today.strftime("%Y-%m"))
-    d1 = {'x': 1, 'y': 2}
-    print(d1.get('abc'))
-    # d2 = {'a': 1}
-    # print({**d1, **d2, 'a': 333})
-    # s1 = "10 Gold"
-    # print('Gold' in s1)
-    # print(s1.replace("Gold", "").strip())
-
+#     reward_resp_data_handler(reward_resp_data, data)
+#
+#     # 创建文件
+#     data_file_path = "./data.json"
+#
+#     if os.path.exists(data_file_path) is False:
+#         with open(data_file_path, 'w'):
+#             pass
+#
+#     with open(data_file_path, 'r+') as _file:
+#         json_str = _file.read()
+#         is_not_empty = len(json_str) > 0
+#         # merged = (json.loads(json_str) if is_not_empty else {}) | data
+#         merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
+#         print(merged)
+#         # 清空文件内容，再重新写入
+#         if is_not_empty:
+#             _file.seek(0)
+#             _file.truncate()
+#         json.dump(merged, _file)
+#
+#
+# def redeem_test():
+#     pass
+#
+#
+# if __name__ == '__main__':
+#     getting_rewards_handler()
+#     # stop_event = threading.Event()
+#     # jobs_checker_thread = None
+#     # try:
+#     #     jobs_checker_thread = threading.Thread(target=p, args=(stop_event,))
+#     #     jobs_checker_thread.start()
+#     #     time.sleep(60)
+#     # except (Exception, KeyboardInterrupt) as e:
+#     #     print(e)
+#     #     stop_event.set()
+#     #     if jobs_checker_thread is not None:
+#     #         jobs_checker_thread.join()
+#     #     print('---> 退出程序.')
+#

@@ -149,7 +149,8 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
         'month': _date,
         'limit_str': local_data.get('limit').strftime(DATE_FORMAT),
-        'current_gold': html_data.get('gold')
+        'current_gold': int(html_data.get('gold')),
+        _date: local_data.get(_date)
     }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
@@ -412,8 +413,8 @@ def get_dict_params(mode, execution_time):
 
 
 # 使用额外线程，每隔段时间唤醒scheduler
-def jobs_checker(sc):
-    while True:
+def jobs_checker(sc, event):
+    while not event.is_set():
         logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime(DATE_FORMAT)))
         time.sleep(60 * 60)
         logger.debug(
@@ -449,14 +450,17 @@ if __name__ == '__main__':
                       args=[config, True, None, True],
                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
 
-    jobs_checker_thread = None
+    jobs_checker_thread, event = None, None
     try:
         if mode == '1':
-            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
+            event = threading.Event()
+            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler, event))
             jobs_checker_thread.start()
         scheduler.start()
-    except BaseException as e:
+    except (Exception, KeyboardInterrupt) as e:
         logger.debug(f"捕获异常->{e}")
+        if event is not None:
+            event.set()
         if jobs_checker_thread is not None:
             jobs_checker_thread.join()
         print('---> 退出程序.')

@@ -42,19 +42,21 @@ def parse_html_for_data(html):
     _d = {
         'csrf_token': meta_ele.attrs['content'],
         'calendar_id': calendar_id,
-        'destination': None,
-        'gold': 0
+        'destination': False,
+        'gold': 0, 'url': ''
     }
     if calendar_id is not None:
-        if future_reward is None:
-            _d['destination'] = rewards_calendar_ele.find('div', {'class': 'reward-status-current-not-claimed'}) is None
         # 有可能是金币或优惠卷
         reward = rewards_calendar_ele.find('div', class_='reward-status-current-not-claimed')
-        if reward is None:
-            reward = future_reward.find_previous_sibling('div')
-        reward_text = reward.div.span.text
-        if 'Gold' in reward_text:
-            _d['gold'] = reward_text.replace("Gold", "").strip()
+        if future_reward is None:
+            _d['destination'] = reward is None
+        if _d['destination'] is False:
+            if reward is None:
+                reward = future_reward.find_previous_sibling('div')
+            reward_text = reward.div.span.text
+            if 'Gold' in reward_text:
+                _d['gold'] = reward_text.replace("Gold", "").strip()
+        _d['url'] = reward.attrs['data-link']
     return _d
 
 
@@ -71,7 +73,6 @@ def get_nutaku_home(cookies, proxies, config):
         'Origin': 'https://www.nutaku.net',
         'Referer': 'https://www.nutaku.net/home/'
     }
-    # logger.debug("headers->{}".format(headers | COOKIE))
     logger.debug("headers->{}".format({**headers, **COOKIE}))
     timeout = config.get('settings', 'connection_timeout')
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=int(timeout), verify=False)
@@ -82,7 +83,6 @@ def get_nutaku_home(cookies, proxies, config):
 
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
-    url = f'https://www.nutaku.net{config.get("api", "redeem")}'
     _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -102,8 +102,7 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.debug("headers->{}".format(headers))
     timeout = config.get('settings', 'connection_timeout')
     headers['Cookie'] = _cookie.format(cookies.get("NUTAKUID"), cookies.get("Nutaku_TOKEN"))
-    resp = requests.post(url, headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
-    # 请求成功时，将会返回{"userGold": "1"}
+    resp = requests.post(html_data.get('url'), headers=headers, data=data, proxies=proxies, timeout=int(timeout), verify=False)
     logger.debug("status_code->{}".format(resp.status_code))
     logger.debug("resp_text->{}".format(resp.text))
     status_code = resp.status_code
@@ -120,12 +119,12 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
     item = resp_data.get('userGold')
     _content = "当前签到物件为未知物件"
     if item is not None:
-        _date = datetime.datetime.today().strftime("%Y-%m")
         # 获取本月金币
-        monthly_amount = data.get(_date)
-        data[_date] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get('current_gold')
-        print(f"---> 当前金币为：{item}，本月累计金币为：{data[_date]}\n")
-        _content = f'当前账号金币为：{item}，本月累计金币为：{data[_date]}'
+        month = data.get('month')
+        monthly_amount = data.get(month)
+        data[month] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get('current_gold')
+        print(f"---> 当前金币为：{item}，本月累计金币为：{data[month]}\n")
+        _content = f'当前账号金币为：{item}，本月累计金币为：{data[month]}'
         data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
         item = resp_data.get('coupon')
@@ -134,9 +133,6 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
     else:
         print("---> " + _content + "\n")
     data['content'] = _content
-    # 邮箱通知
-    if config.get('settings', 'email_notification') == 'on':
-        send_email(config=config, data=data, logger=logger)
 
 
 def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
@@ -146,13 +142,15 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     status_code = reward_resp_data.get('code')
 
     data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+    _date = datetime.datetime.today().strftime("%Y-%m")
     data = {
         'date': datetime.datetime.now().strftime('%Y-%m-%d'),
         'email': config.get('account', 'email'),
         'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
-        **local_data,
+        'month': _date,
         'limit_str': local_data.get('limit').strftime(DATE_FORMAT),
-        'current_gold': html_data.get('gold')
+        'current_gold': int(html_data.get('gold')),
+        _date: local_data.get(_date)
     }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
@@ -301,6 +299,9 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
             print("恭喜，已经全部签到完成.")
             kill_process()
             return
+        else:
+            if config.get('settings', 'email_notification') == 'on':
+                send_email(config=config, data=local_data, logger=logger)
         # 未登陆或登陆已失效
         if html_data.get('calendar_id') is None:
             print(fail_message2 + '未登陆或登陆过期')
@@ -326,9 +327,7 @@ def listener(event, sd, conf):
         today = datetime.datetime.today()
         local_data = load_data(conf, logger)
         limit_str = local_data.get('limit_str')
-        # limit = None
         # 限制时间是第二天的早上8点，因此，一般情况下limit和today不在同一天；而如果处于同一天时，说明limit还没更新（比如没有请求n站成功就进入了重试逻辑）
-        # if limit_str is not None:
         limit = datetime.datetime.strptime(limit_str, DATE_FORMAT) if limit_str is not None else today
         # 获取当前时间，加上时间间隔
         next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
@@ -343,7 +342,6 @@ def listener(event, sd, conf):
         _retrying = int(conf.get('settings', '_retrying'))
         if _retrying > 1:
             _retrying -= 1
-            # conf.set('settings', '_retrying', _retrying)
             set_retrying_copying(conf, str(_retrying))
             if limit is None or next_time < limit or matched:
                 print(f'---> 将会在{next_time}进行重试.')
@@ -414,13 +412,13 @@ def get_dict_params(mode, execution_time):
     return params
 
 
-# 使用额外线程，每30分钟唤醒一次scheduler
-def jobs_checker(sc):
-    while True:
-        logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        time.sleep(60 * 39)
+# 使用额外线程，每隔段时间唤醒scheduler
+def jobs_checker(sc, event):
+    while not event.is_set():
+        logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime(DATE_FORMAT)))
+        time.sleep(60 * 60)
         logger.debug(
-            '->{} 任务检查线程休眠；唤醒定时任务调度器...'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            '->{} 任务检查线程休眠；唤醒定时任务调度器...'.format(datetime.datetime.now().strftime(DATE_FORMAT)))
         sc.wakeup()
 
 
@@ -452,11 +450,17 @@ if __name__ == '__main__':
                       args=[config, True, None, True],
                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
 
+    jobs_checker_thread, event = None, None
     try:
         if mode == '1':
-            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
+            event = threading.Event()
+            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler, event))
             jobs_checker_thread.start()
         scheduler.start()
-    except BaseException as e:
+    except (Exception, KeyboardInterrupt) as e:
         logger.debug(f"捕获异常->{e}")
+        if event is not None:
+            event.set()
+        if jobs_checker_thread is not None:
+            jobs_checker_thread.join()
         print('---> 退出程序.')

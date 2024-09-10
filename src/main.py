@@ -33,21 +33,21 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 def parse_html_for_data(html):
     soup = BeautifulSoup(html, 'html.parser')
-    rewards_calendar_ele = soup.find('section', {'class': 'js-rewards-calendar'})
+    _rewards_calendar = soup.find('section', {'class': 'js-rewards-calendar'})
 
-    meta_ele = soup.find('meta', {'name': 'csrf-token'})
+    _meta = soup.find('meta', {'name': 'csrf-token'})
     # 表示是否已经全部签到完成（无可再签）
-    calendar_id = rewards_calendar_ele.attrs['data-calendar-id'] if rewards_calendar_ele is not None else None
+    calendar_id = _rewards_calendar.attrs['data-calendar-id'] if _rewards_calendar is not None else None
     future_reward = soup.find('div', {'class': 'reward-status-future'})
     _d = {
-        'csrf_token': meta_ele.attrs['content'],
+        'csrf_token': _meta.attrs['content'],
         'calendar_id': calendar_id,
         'destination': False,
         'gold': 0, 'url': ''
     }
     if calendar_id is not None:
         # 有可能是金币或优惠卷
-        reward = rewards_calendar_ele.find('div', class_='reward-status-current-not-claimed')
+        reward = _rewards_calendar.find('div', class_='reward-status-current-not-claimed')
         if future_reward is None:
             _d['destination'] = reward is None
         if _d['destination'] is False:
@@ -57,6 +57,13 @@ def parse_html_for_data(html):
             if 'Gold' in reward_text:
                 _d['gold'] = reward_text.replace("Gold", "").strip()
         _d['url'] = reward.attrs['data-link']
+        _rewards_list = soup.find('div', {'class': 'reward-list'})
+        _text_rewards = _rewards_list.find_all('span', {'class': 'text-reward'})
+        total = 0
+        for item in _text_rewards:
+            if 'Gold' in item.text:
+                total += int(item.text.replace("Gold", "").strip())
+        _d['total_gold'] = total
     return _d
 
 
@@ -123,8 +130,8 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
         month = data.get('month')
         monthly_amount = data.get(month)
         data[month] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get('current_gold')
-        print(f"---> 当前金币为：{item}，本月累计金币为：{data[month]}\n")
-        _content = f'当前账号金币为：{item}，本月累计金币为：{data[month]}'
+        print(f"---> 当前金币：{item}，本月领取累计：{data[month]}/{data.get(f'{month}_total')}\n")
+        _content = f"当前账号金币：{item}，本月领取累计：{data[month]}/{data.get(f'{month}_total')}"
         data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
         item = resp_data.get('coupon')
@@ -150,7 +157,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         'month': _date,
         'limit_str': local_data.get('limit').strftime(DATE_FORMAT),
         'current_gold': int(html_data.get('gold')),
-        _date: local_data.get(_date)
+        _date: local_data.get(_date), f'{_date}_total': html_data.get("total_gold")
     }
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")

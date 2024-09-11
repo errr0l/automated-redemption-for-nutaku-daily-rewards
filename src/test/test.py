@@ -1,4 +1,5 @@
-# import datetime
+import datetime
+import re
 # import json
 # import os
 # import threading
@@ -67,7 +68,15 @@
 #     pass
 #
 #
-# if __name__ == '__main__':
+if __name__ == '__main__':
+    now = datetime.datetime.now()
+    print(now.day)
+    print(now.weekday())
+    print(now.strftime("%Y-%m-%d"))
+    print(now.strftime("%Y-%m"))
+    d1 = "2024-9-12"
+    r = re.findall("-(\\d+)$", d1)
+    print(r)
 #     getting_rewards_handler()
 #     # stop_event = threading.Event()
 #     # jobs_checker_thread = None

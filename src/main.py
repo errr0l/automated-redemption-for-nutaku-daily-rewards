@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -149,9 +150,10 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     status_code = reward_resp_data.get('code')
 
     data_file_path = config.get('sys', 'dir') + separator + 'data.json'
-    _date = datetime.datetime.today().strftime("%Y-%m")
+    now = datetime.datetime.now()
+    _date = now.strftime("%Y-%m")
     data = {
-        'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+        'date': now.strftime('%Y-%m-%d'),
         'email': config.get('account', 'email'),
         'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
         'month': _date,
@@ -162,10 +164,10 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     if status_code is not None and status_code == 422:
         logger.debug("结果->重复签到或其他（多为前者）.")
         print('---> {} 已经签到.'.format(data.get('date')))
+        return
     else:
         print(success_message)
         reward_resp_data_handler(reward_resp_data, data)
-
     # 创建文件
     if os.path.exists(data_file_path) is False:
         with open(data_file_path, 'w'):
@@ -176,6 +178,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         is_not_empty = len(json_str) > 0
         # merged = (json.loads(json_str) if is_not_empty else {}) | data
         merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
+        set_email_by_strategy(config, merged, logger, False)
         # 清空文件内容，再重新写入
         if is_not_empty:
             _file.seek(0)
@@ -234,6 +237,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
                 print("恭喜，已经全部签到完成.")
+                set_email_by_strategy(config, local_data, logger, True)
                 kill_process()
                 return
             if html_data.get("calendar_id") is not None:
@@ -249,6 +253,25 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
     except JSONDecodeError:
         logger.debug("登陆失败，未知原因.")
         raise RuntimeError(fail_message2 + err_message)
+
+
+def set_email_by_strategy(config, local_data, logger, destination):
+    if config.get('settings', 'email_notification') == 'on':
+        strategy = config.get('settings', 'email_notification_strategy')
+        now = datetime.datetime.now()
+        if destination:
+            _date = local_data.get("date")
+            _day = int(re.findall("-(\\d+)$", _date)[0])
+            if (now.day - 1) != _day:
+                send_email(config, local_data, logger)
+        elif strategy == 'day':
+            send_email(config=config, data=local_data, logger=logger)
+        elif strategy == 'week':
+            if now.weekday() == 1:
+                send_email(config=config, data=local_data, logger=logger)
+        elif strategy == 'month':
+            if now.day == 1:
+                send_email(config=config, data=local_data, logger=logger)
 
 
 def redeem(config, clearing=False, local_data: dict = None, reloading=False):
@@ -306,9 +329,6 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
             print("恭喜，已经全部签到完成.")
             kill_process()
             return
-        else:
-            if config.get('settings', 'email_notification') == 'on':
-                send_email(config=config, data=local_data, logger=logger)
         # 未登陆或登陆已失效
         if html_data.get('calendar_id') is None:
             print(fail_message2 + '未登陆或登陆过期')

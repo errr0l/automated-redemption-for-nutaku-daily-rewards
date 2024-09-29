@@ -54,10 +54,10 @@ def parse_html_for_data(html):
         if _d['destination'] is False:
             if reward is None:
                 reward = future_reward.find_previous_sibling('div')
+            _d['url'] = reward.attrs['data-link']
             reward_text = reward.div.span.text
             if 'Gold' in reward_text:
                 _d['gold'] = reward_text.replace("Gold", "").strip()
-        _d['url'] = reward.attrs['data-link']
         _rewards_list = soup.find('div', {'class': 'reward-list'})
         _text_rewards = _rewards_list.find_all('span', {'class': 'text-reward'})
         total = 0
@@ -143,13 +143,31 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
     data['content'] = _content
 
 
+def record(config, data):
+    data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+    # 创建文件
+    if os.path.exists(data_file_path) is False:
+        with open(data_file_path, 'w'):
+            pass
+
+    with open(data_file_path, 'r+') as _file:
+        json_str = _file.read()
+        is_not_empty = len(json_str) > 0
+        # merged = (json.loads(json_str) if is_not_empty else {}) | data
+        merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
+        # 清空文件内容，再重新写入
+        if is_not_empty:
+            _file.seek(0)
+            _file.truncate()
+        json.dump(merged, _file)
+
+
 def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     print('---> 开始签到.')
     reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
     logger.debug("resp_data->{}".format(reward_resp_data))
     status_code = reward_resp_data.get('code')
 
-    data_file_path = config.get('sys', 'dir') + separator + 'data.json'
     now = datetime.datetime.now()
     _date = now.strftime("%Y-%m")
     data = {
@@ -168,22 +186,24 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     else:
         print(success_message)
         reward_resp_data_handler(reward_resp_data, data)
+    set_email_by_strategy(config, local_data, logger, False)
+    record(config, data)
     # 创建文件
-    if os.path.exists(data_file_path) is False:
-        with open(data_file_path, 'w'):
-            pass
-
-    with open(data_file_path, 'r+') as _file:
-        json_str = _file.read()
-        is_not_empty = len(json_str) > 0
-        # merged = (json.loads(json_str) if is_not_empty else {}) | data
-        merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
-        set_email_by_strategy(config, merged, logger, False)
-        # 清空文件内容，再重新写入
-        if is_not_empty:
-            _file.seek(0)
-            _file.truncate()
-        json.dump(merged, _file)
+    # if os.path.exists(data_file_path) is False:
+    #     with open(data_file_path, 'w'):
+    #         pass
+    #
+    # with open(data_file_path, 'r+') as _file:
+    #     json_str = _file.read()
+    #     is_not_empty = len(json_str) > 0
+    #     # merged = (json.loads(json_str) if is_not_empty else {}) | data
+    #     merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
+    #     set_email_by_strategy(config, merged, logger, False)
+    #     # 清空文件内容，再重新写入
+    #     if is_not_empty:
+    #         _file.seek(0)
+    #         _file.truncate()
+    #     json.dump(merged, _file)
 
 
 # 登陆nutaku账号；
@@ -236,9 +256,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
             html_data = parse_html_for_data(home_resp.text)
             logger.debug("html_data->{}".format(html_data))
             if html_data.get("destination"):
-                print("恭喜，已经全部签到完成.")
-                set_email_by_strategy(config, local_data, logger, True)
-                kill_process()
+                destination_handler(local_data)
                 return
             if html_data.get("calendar_id") is not None:
                 print(success_message)
@@ -259,19 +277,32 @@ def set_email_by_strategy(config, local_data, logger, destination):
     if config.get('settings', 'email_notification') == 'on':
         strategy = config.get('settings', 'email_notification_strategy')
         now = datetime.datetime.now()
+        r = False
         if destination:
-            _date = local_data.get("date")
-            _day = int(re.findall("-(\\d+)$", _date)[0])
-            if (now.day - 1) != _day:
-                send_email(config, local_data, logger)
+            _date = local_data.get("emailed")
+            print(_date)
+            if _date is None or _date == '' or ((now.day - 1) != int(re.findall("-(\\d+)$", _date)[0])):
+                r = send_email(config, local_data, logger)
         elif strategy == 'day':
-            send_email(config=config, data=local_data, logger=logger)
+            r = send_email(config=config, data=local_data, logger=logger)
         elif strategy == 'week':
             if now.weekday() == 1:
-                send_email(config=config, data=local_data, logger=logger)
+                r = send_email(config=config, data=local_data, logger=logger)
         elif strategy == 'month':
             if now.day == 1:
-                send_email(config=config, data=local_data, logger=logger)
+                r = send_email(config=config, data=local_data, logger=logger)
+        if r:
+            local_data['emailed'] = datetime.datetime.now().strftime('%Y-%m-%d')
+
+
+def destination_handler(local_data):
+    print("恭喜，已经全部签到完成.")
+    emailed = local_data.get('emailed')
+    set_email_by_strategy(config, local_data, logger, True)
+    if emailed != local_data.get('emailed'):
+        emailed = local_data.get('emailed')
+        record(config, {'emailed': emailed})
+    kill_process()
 
 
 def redeem(config, clearing=False, local_data: dict = None, reloading=False):
@@ -326,8 +357,7 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
         html_data = parse_html_for_data(home_resp.text)
         logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
-            print("恭喜，已经全部签到完成.")
-            kill_process()
+            destination_handler(local_data)
             return
         # 未登陆或登陆已失效
         if html_data.get('calendar_id') is None:
@@ -440,8 +470,8 @@ def get_dict_params(mode, execution_time):
 
 
 # 使用额外线程，每隔段时间唤醒scheduler
-def jobs_checker(sc, event):
-    while not event.is_set():
+def jobs_checker(sc):
+    while True:
         logger.debug('->{} 任务检查线程休眠...'.format(datetime.datetime.now().strftime(DATE_FORMAT)))
         time.sleep(60 * 60)
         logger.debug(
@@ -476,18 +506,13 @@ if __name__ == '__main__':
     scheduler.add_job(id='001', func=redeem, **get_dict_params(mode, execution_time),
                       args=[config, True, None, True],
                       misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
-
-    jobs_checker_thread, event = None, None
     try:
         if mode == '1':
-            event = threading.Event()
-            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler, event))
+            jobs_checker_thread = threading.Thread(target=jobs_checker, args=(scheduler,))
+            jobs_checker_thread.setDaemon(True)
             jobs_checker_thread.start()
         scheduler.start()
     except (Exception, KeyboardInterrupt) as e:
         logger.debug(f"捕获异常->{e}")
-        if event is not None:
-            event.set()
-        if jobs_checker_thread is not None:
-            jobs_checker_thread.join()
+        scheduler.shutdown()
         print('---> 退出程序.')

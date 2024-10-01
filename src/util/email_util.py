@@ -1,9 +1,11 @@
+import datetime
+
 import requests
 import logging
 import sys
 import os
 import json
-from src.util.common import get_config
+from src.util.common import get_config, get_month_days
 
 
 def send_email(config, data: dict, logger=None):
@@ -39,15 +41,54 @@ def send_email(config, data: dict, logger=None):
         return False
 
 
-if __name__ == '__main__':
-    current_dir = os.path.dirname(sys.argv[0])
-    print('---> 当前目录为：' + current_dir)
-    print('---> 读取配置文件.')
+# def set_email_by_strategy(config, local_data, logger, destination):
+#     if config.get('settings', 'email_notification') == 'on':
+#         strategy = config.get('settings', 'email_notification_strategy')
+#         now = datetime.datetime.now()
+#         _date = local_data.get("emailed", '')
+#         _map = {'day': 1, 'week': 7}
+#         interval = _map.get(strategy)
+#         if destination:
+#             local_data['content'] = '本月签到已全部完成，' + local_data.get('content').replace('本月', '')
+#         r = False
+#         if _date == '':
+#             # r = send_email(config, local_data, logger)
+#             print(1)
+#         else:
+#             _date = [int(item) for item in _date.split("-")]
+#             # 年份不同暂不考虑；
+#             # 如果月份不同，则间隔算法为：上月总天数-上月最后的签到日期+当月天数；如果月份相同，则为：当天-_date[2]
+#             if _date[1] != now.month:
+#                 last_month_days = get_month_days(_date[1], _date[0])
+#                 if interval >= (last_month_days - _date[2] + now.day):
+#                     # r = send_email(config, local_data, logger)
+#                     print(2)
+#             elif now.day - interval >= _date[2]:
+#                 # r = send_email(config, local_data, logger)
+#                 print(3)
+#         if r:
+#             local_data['emailed'] = now.strftime('%Y-%m-%d')
 
-    logging.basicConfig()
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    config = get_config(current_dir + '/../', logger=logger)
-    with open('../data.json.backup', 'r') as file:
-        data = json.load(file)
-        send_email(config, data=data, logger=logger)
+
+# if __name__ == '__main__':
+#     current_dir = os.path.dirname(sys.argv[0])
+#     print('---> 当前目录为：' + current_dir)
+#     print('---> 读取配置文件.')
+#
+#     logging.basicConfig()
+#     logger = logging.getLogger(__name__)
+#     logger.setLevel(logging.DEBUG)
+#     config = get_config(current_dir + '/../', logger=logger)
+#     with open('../data.json', 'r') as file:
+#         data = json.load(file)
+#         # send_email(config, data=data, logger=logger)
+#         # set_email_by_strategy(config, data, logger, True)
+#     last_month_days = get_month_days(9, 2024)
+#     print(last_month_days)
+#     _date = [2024, 9, 28]
+#     interval = 1
+#     print(last_month_days - _date[2] + datetime.datetime.now().day)
+#     if (last_month_days - _date[2] + datetime.datetime.now().day) >= interval:
+#         print(1)
+#     else:
+#         print(2)

@@ -66,3 +66,11 @@ def clear(tips: bool):
     if tips:
         print('>> 按 Ctrl+{0} 退出程序...'.format('Break' if os.name == 'nt' else 'C'))
         print()
+
+
+def get_month_days(month, year):
+    days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if month == 2 and year % 4 == 0 and year % 100 != 0 or year % 400 == 0:
+        return 28
+    else:
+        return days[month - 1]

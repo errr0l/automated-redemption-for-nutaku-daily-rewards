@@ -29,16 +29,16 @@ def send_email(config, data: dict, logger=None):
             resp_data = resp.json()
             if resp_data.get('code') == 0:
                 logger.debug("已成功发送邮件.")
-                return True
+                return 1
             else:
                 logger.debug(f"发送邮件失败->{resp_data.get('message')}")
-                return False
+                return 2
         else:
             logger.debug(f"发送邮件失败")
-            return False
+            return 2
     except Exception as e:
         logger.debug(f"发送邮件失败，捕获异常->{e}")
-        return False
+        return 2
 
 
 # def set_email_by_strategy(config, local_data, logger, destination):
@@ -70,25 +70,25 @@ def send_email(config, data: dict, logger=None):
 #             local_data['emailed'] = now.strftime('%Y-%m-%d')
 
 
-# if __name__ == '__main__':
-#     current_dir = os.path.dirname(sys.argv[0])
-#     print('---> 当前目录为：' + current_dir)
-#     print('---> 读取配置文件.')
-#
-#     logging.basicConfig()
-#     logger = logging.getLogger(__name__)
-#     logger.setLevel(logging.DEBUG)
-#     config = get_config(current_dir + '/../', logger=logger)
-#     with open('../data.json', 'r') as file:
-#         data = json.load(file)
-#         # send_email(config, data=data, logger=logger)
-#         # set_email_by_strategy(config, data, logger, True)
-#     last_month_days = get_month_days(9, 2024)
-#     print(last_month_days)
-#     _date = [2024, 9, 28]
-#     interval = 1
-#     print(last_month_days - _date[2] + datetime.datetime.now().day)
-#     if (last_month_days - _date[2] + datetime.datetime.now().day) >= interval:
-#         print(1)
-#     else:
-#         print(2)
+if __name__ == '__main__':
+    current_dir = os.path.dirname(sys.argv[0])
+    print('---> 当前目录为：' + current_dir)
+    print('---> 读取配置文件.')
+
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    config = get_config(current_dir + '/../', logger=logger)
+    with open('../data.json', 'r') as file:
+        data = json.load(file)
+        send_email(config, data=data, logger=logger)
+        # set_email_by_strategy(config, data, logger, True)
+    # last_month_days = get_month_days(9, 2024)
+    # print(last_month_days)
+    # _date = [2024, 9, 28]
+    # interval = 1
+    # print(last_month_days - _date[2] + datetime.datetime.now().day)
+    # if (last_month_days - _date[2] + datetime.datetime.now().day) >= interval:
+    #     print(1)
+    # else:
+    #     print(2)

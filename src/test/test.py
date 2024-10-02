@@ -69,6 +69,12 @@ import re
 #
 #
 import threading
+import time
+
+def print_msg(msg):
+    print(msg)
+
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 if __name__ == '__main__':
     # now = datetime.datetime.now()
@@ -101,10 +107,27 @@ if __name__ == '__main__':
 #     #         jobs_checker_thread.join()
 #     #     print('---> 退出程序.')
 
-    now = datetime.datetime.now()
-    print(now.day)
-    print(now.strftime("%Y-%m-%d"))
-    print(now.strftime("%Y-%m-%d").split('-'))
-    print(now.month)
-    s1 = '123123'
-    print(s1.replace('12', 'abc'))
+    # now = datetime.datetime.now()
+    # print(now.day)
+    # print(now.strftime("%Y-%m-%d"))
+    # print(now.strftime("%Y-%m-%d").split('-'))
+    # print(now.month)
+    # s1 = '123123'
+    # print(s1.replace('12', 'abc'))
+    try:
+        # while True:
+        #     # 无限循环中的代码
+        #     time.sleep(10)
+        scheduler = BlockingScheduler()
+        scheduler.add_job(id="1", func=print_msg, args=("hello",), trigger="cron", hour=11, minute=46)
+        scheduler.start()
+    except Exception as e:
+        # print(e)
+        print("捕获到KeyboardInterrupt，正在退出...")
+    finally:
+        # 清理代码，比如关闭文件或释放资源
+        print("程序已退出。")
+    t1 = None
+
+    if t1:
+        print(1)

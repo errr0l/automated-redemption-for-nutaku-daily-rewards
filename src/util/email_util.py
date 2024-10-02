@@ -79,7 +79,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     config = get_config(current_dir + '/../', logger=logger)
-    with open('../data.json', 'r') as file:
+    with open('../data.json.backup', 'r') as file:
         data = json.load(file)
         send_email(config, data=data, logger=logger)
         # set_email_by_strategy(config, data, logger, True)

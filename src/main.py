@@ -511,7 +511,6 @@ if __name__ == '__main__':
         logging.basicConfig(filename=f'{current_dir}/app.log', format='%(asctime)s - %(levelname)s - %(message)s')
         logging.getLogger('apscheduler').setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
-
         scheduler = BlockingScheduler(option={'logger': logger})
         execution_time = parse_execution_time(config.get('settings', 'execution_time'))
 

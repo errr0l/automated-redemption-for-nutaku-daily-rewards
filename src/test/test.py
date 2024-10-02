@@ -36,7 +36,7 @@ import re
 #     # logger.debug("resp_data->{}".format(reward_resp_data))
 #     # status_code = reward_resp_data.get('code')
 #
-#     # data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+#     # data_file_path = config.get('sys', 'dir') + separator + 'data.json.backup'
 #     _date = datetime.datetime.today().strftime("%Y-%m")
 #     data = {'date': '2024-09-08', 'email': 'err0l@qq.com', 'month': '2024-09', 'current_gold': 10, _date: '111'}
 #     reward_resp_data = {
@@ -45,7 +45,7 @@ import re
 #     reward_resp_data_handler(reward_resp_data, data)
 #
 #     # 创建文件
-#     data_file_path = "./data.json"
+#     data_file_path = "./data.json.backup"
 #
 #     if os.path.exists(data_file_path) is False:
 #         with open(data_file_path, 'w'):

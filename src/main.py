@@ -5,6 +5,7 @@ import os
 import sys
 import threading
 import time
+import signal
 import urllib.parse
 import urllib3
 from json import JSONDecodeError
@@ -427,9 +428,9 @@ def set_limit_time(local_data: dict):
         local_data['limit'] = limit
 
 
-def wrapper(fn, sd, conf):
+def wrapper(fn, p1, p2):
     def inner(event):
-        return fn(event, sd, conf)
+        return fn(event, p1, p2)
     return inner
 
 
@@ -484,10 +485,11 @@ def print_next_run_time(job):
             if _hour < now.hour:
                 continue
             # 计算执行时间
-            next_run_time = now + datetime.timedelta(
+            _timedelta = datetime.timedelta(
                 hours=_hour - now.hour,
                 minutes=(int(_minutes[0]) if len(_minutes) == 1 else int(_minutes[i])) - now.minute)
-            print(f"---> 预计执行时间：{next_run_time}")
+
+            print(f"---> 预计执行时间：{now + _timedelta} (in {_timedelta.seconds}s)")
             break
 
 
@@ -495,36 +497,40 @@ def set_retrying_copying(conf, value):
     conf.set('settings', '_retrying', value)
 
 
-if __name__ == '__main__':
-    scheduler = None
-    try:
-        clear(True)
-        current_dir = os.path.dirname(sys.argv[0])
-        print('---> 当前目录为：' + current_dir)
-        print('---> 读取配置文件.')
-        config = get_config(current_dir, logger)
-        config.add_section('sys')
-        config.set('sys', 'dir', current_dir)
-        set_retrying_copying(config, config.get('settings', 'retrying'))
-        print(success_message)
-        mode = config.get('settings', 'execution_mode')
-        logging.basicConfig(filename=f'{current_dir}/app.log', format='%(asctime)s - %(levelname)s - %(message)s')
-        logging.getLogger('apscheduler').setLevel(logging.DEBUG)
-        logger.setLevel(logging.DEBUG)
-        scheduler = BlockingScheduler(option={'logger': logger})
-        execution_time = parse_execution_time(config.get('settings', 'execution_time'))
+def shutdown_handler(signum, frame):
+    sys.exit(0)
 
-        scheduler.add_listener(wrapper(listener, scheduler, config), (EVENT_JOB_EXECUTED | EVENT_JOB_ERROR))
-        scheduler.add_job(id='001', func=redeem, **get_dict_params(mode, execution_time),
-                          args=[config, True, None, True],
-                          misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
-        if mode == '1':
-            jobs_checker_thread = threading.Thread(target=jobs_checker,
-                                                   args=(scheduler, int(config.get("settings", "check_interval"))))
-            jobs_checker_thread.setDaemon(True)
-            jobs_checker_thread.start()
-        else:
-            print_next_run_time(scheduler.get_job(job_id="001"))
+
+if __name__ == '__main__':
+    clear(True)
+    current_dir = os.path.dirname(sys.argv[0])
+    print('---> 当前目录为：' + current_dir)
+    print('---> 读取配置文件.')
+    config = get_config(current_dir, logger)
+    config.add_section('sys')
+    config.set('sys', 'dir', current_dir)
+    set_retrying_copying(config, config.get('settings', 'retrying'))
+    print(success_message)
+    mode = config.get('settings', 'execution_mode')
+    logging.basicConfig(filename=f'{current_dir}/app.log', format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
+    scheduler = BlockingScheduler(option={'logger': logger})
+    execution_time = parse_execution_time(config.get('settings', 'execution_time'))
+
+    scheduler.add_listener(wrapper(listener, scheduler, config), (EVENT_JOB_EXECUTED | EVENT_JOB_ERROR))
+    scheduler.add_job(id='001', func=redeem, **get_dict_params(mode, execution_time),
+                      args=[config, True, None, True],
+                      misfire_grace_time=config.getint('settings', 'misfire_grace_time') * 60)
+    if mode == '1':
+        jobs_checker_thread = threading.Thread(target=jobs_checker,
+                                               args=(scheduler, int(config.get("settings", "check_interval"))))
+        jobs_checker_thread.setDaemon(True)
+        jobs_checker_thread.start()
+    else:
+        print_next_run_time(scheduler.get_job(job_id="001"))
+    signal.signal(signal.SIGINT, shutdown_handler)
+    try:
         scheduler.start()
     except:
-        print('---> 退出程序.')
+        pass

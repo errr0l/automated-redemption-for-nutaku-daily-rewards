@@ -93,6 +93,11 @@ if __name__ == '__main__':
     d2 = d.get('xx', '')
     print('1' + d2 + '2')
     print(d2)
+
+    _timedelta = datetime.timedelta(
+        hours=1,
+        minutes=30)
+    print(_timedelta.seconds)
 #     getting_rewards_handler()
 #     # stop_event = threading.Event()
 #     # jobs_checker_thread = None

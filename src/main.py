@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import math
 import os
 import sys
 import threading
@@ -188,7 +189,7 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     else:
         print(success_message)
         reward_resp_data_handler(reward_resp_data, data)
-    emailed = set_email_by_strategy(config, local_data, logger, False)
+    emailed = set_email_by_strategy(config, {**local_data, **data}, logger, False)
     if emailed is not None:
         data['emailed'] = emailed
     record(config, data)
@@ -472,13 +473,14 @@ def jobs_checker(sc, check_interval):
 
 
 def print_next_run_time(job):
+    now = datetime.datetime.now()
     if hasattr(job, 'next_run_time'):
-        print(f"---> 预计执行时间：{job.next_run_time}")
+        print(type(job.next_run_time))
+        print(f"---> 预计执行时间：{job.next_run_time} (in {math.ceil(job.next_run_time.timestamp() - now.timestamp())}s)")
     elif hasattr(job, 'trigger'):
         fields = job.trigger.fields
         hours = str(fields[5])
         minutes = str(fields[6])
-        now = datetime.datetime.now()
         _minutes = minutes.split(',')
         for i, item in enumerate(hours.split(',')):
             _hour = int(item)

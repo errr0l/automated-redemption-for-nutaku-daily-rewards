@@ -390,10 +390,10 @@ def listener(event, sd, conf):
         if matched:
             logger.info("截止日期未更新")
         _retrying = int(conf.get('settings', '_retrying'))
-        if _retrying > 1:
+        if _retrying > 0:
             _retrying -= 1
             set_retrying_copying(conf, str(_retrying))
-            if limit is None or next_time < limit or matched:
+            if limit is None or next_time < limit or not matched:
                 print(f'---> 请求失败，将会在{next_time}进行重试.')
                 # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
                 if is_job_001:
@@ -475,7 +475,6 @@ def jobs_checker(sc, check_interval):
 def print_next_run_time(job):
     now = datetime.datetime.now()
     if hasattr(job, 'next_run_time'):
-        print(type(job.next_run_time))
         print(f"---> 预计执行时间：{job.next_run_time} (in {math.ceil(job.next_run_time.timestamp() - now.timestamp())}s)")
     elif hasattr(job, 'trigger'):
         fields = job.trigger.fields

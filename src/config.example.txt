@@ -12,12 +12,10 @@ proxy=off
 
 # 其他设置
 [settings]
-# 日志（on=启用；off=关闭）
-log=on
-# 调试模式（on=启用；off=关闭）
-debug=on
 # 邮箱通知；以当前账号为准（on=启用；off=关闭）
 email_notification=on
+# 邮件通知频次（day=每日；week=每周），参考点为'上一个签到日期'
+email_notification_strategy=week
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
 retrying=5
 # 重试间隔（单位，分钟）
@@ -29,13 +27,13 @@ execution_time=11,20:26
 misfire_grace_time=600
 # 执行模式（1=默认，程序持续运行；2=执行完后退出程序）
 # 模式1适用于电脑不关机的情况；模式2适用于电脑日常关机的情况，可配合'开机启动'使用
-execution_mode=1
+execution_mode=2
 # 连接超时时间（单位，秒）
 connection_timeout=30
+# 检查时间间隔（单位，分）
+check_interval=45
 
 # 接口路径
 [api]
-# 签到接口
-#redeem=/rewards-calendar/rewards-calendar/redeem/
 # 邮件通知接口
-email_notification=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
+email_notification=http://err0l.shenzhuo.vip:29895/0/easyshop/portal/email/notification

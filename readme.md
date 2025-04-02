@@ -30,6 +30,10 @@ log=on
 debug=on
 # 邮箱通知；以当前账号为准（on=启用；off=关闭）
 email_notification=on
+# 邮件通知频次（day=每日；week=每周；month=每月）
+# 在指定规则周期内的第一个时间点发送邮件通知，即是说，若规则为"week"，则会在周一进行通知；"month"在每月一号通知
+# 除day外，其他参数配置会在签到全部完成时进行一次额外通知（实际上其内容是'上一次'签到的结果）
+email_notification_strategy=week
 # 签到重试次数；当由于网络或其他因素导致签到失败时，程序会自动进行重试
 retrying=5
 # 重试间隔（单位，分钟）
@@ -48,7 +52,7 @@ connection_timeout=30
 # 接口路径
 [api]
 # 邮件通知接口
-email_notification=http://errol.shenzhuo.vip:26107/0/easyshop/portal/email/notification
+email_notification=http://g0wg60y8.shenzhuo.vip:29895/0/easyshop/portal/email/notification
 ```
 
 ## 运行
@@ -76,6 +80,20 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 > pip3 install -r requirements.txt
 
 ## 更新日志
+
+2024-11
+
+1、修复了因日期判断错误无法正常重试签到的问题
+
+2024-10
+
+1、新增了日志文件（避免界面信息过多）
+
+2024-09
+
+1、新增了按规则进行邮件通知的特性
+2、修复了无法正常主动退出程序的问题（ctrl+c）
+3、优化了邮件通知策略
 
 2024-08
 

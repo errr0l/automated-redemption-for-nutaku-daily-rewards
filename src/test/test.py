@@ -1,4 +1,5 @@
-# import datetime
+import datetime
+import re
 # import json
 # import os
 # import threading
@@ -35,7 +36,7 @@
 #     # logger.debug("resp_data->{}".format(reward_resp_data))
 #     # status_code = reward_resp_data.get('code')
 #
-#     # data_file_path = config.get('sys', 'dir') + separator + 'data.json'
+#     # data_file_path = config.get('sys', 'dir') + separator + 'data.json.backup'
 #     _date = datetime.datetime.today().strftime("%Y-%m")
 #     data = {'date': '2024-09-08', 'email': 'err0l@qq.com', 'month': '2024-09', 'current_gold': 10, _date: '111'}
 #     reward_resp_data = {
@@ -44,7 +45,7 @@
 #     reward_resp_data_handler(reward_resp_data, data)
 #
 #     # 创建文件
-#     data_file_path = "./data.json"
+#     data_file_path = "./data.json.backup"
 #
 #     if os.path.exists(data_file_path) is False:
 #         with open(data_file_path, 'w'):
@@ -67,7 +68,36 @@
 #     pass
 #
 #
-# if __name__ == '__main__':
+import threading
+import time
+
+def print_msg(msg):
+    print(msg)
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+
+if __name__ == '__main__':
+    # now = datetime.datetime.now()
+    # print(now.day)
+    # print(now.weekday())
+    # print(now.strftime("%Y-%m-%d"))
+    # print(now.strftime("%Y-%m"))
+    # d1 = "2024-9-12"
+    # r = re.findall("-(\\d+)$", d1)
+    # print(r)
+    # event = threading.Event()
+    # print(event.is_set())
+    # event.set()
+    # print(event.is_set())
+    d = {'x': 1, 'y': 2}
+    d2 = d.get('xx', '')
+    print('1' + d2 + '2')
+    print(d2)
+
+    _timedelta = datetime.timedelta(
+        hours=1,
+        minutes=30)
+    print(_timedelta.seconds)
 #     getting_rewards_handler()
 #     # stop_event = threading.Event()
 #     # jobs_checker_thread = None
@@ -81,4 +111,28 @@
 #     #     if jobs_checker_thread is not None:
 #     #         jobs_checker_thread.join()
 #     #     print('---> 退出程序.')
-#
+
+    # now = datetime.datetime.now()
+    # print(now.day)
+    # print(now.strftime("%Y-%m-%d"))
+    # print(now.strftime("%Y-%m-%d").split('-'))
+    # print(now.month)
+    # s1 = '123123'
+    # print(s1.replace('12', 'abc'))
+    try:
+        # while True:
+        #     # 无限循环中的代码
+        #     time.sleep(10)
+        scheduler = BlockingScheduler()
+        scheduler.add_job(id="1", func=print_msg, args=("hello",), trigger="cron", hour=11, minute=46)
+        scheduler.start()
+    except Exception as e:
+        # print(e)
+        print("捕获到KeyboardInterrupt，正在退出...")
+    finally:
+        # 清理代码，比如关闭文件或释放资源
+        print("程序已退出。")
+    t1 = None
+
+    if t1:
+        print(1)

@@ -9,3 +9,4 @@ src/data.json
 src/*.html
 src/abc.txt
 venv
+*.log

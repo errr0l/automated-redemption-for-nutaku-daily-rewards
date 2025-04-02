@@ -20,6 +20,7 @@ from util.common import get_config, parse_execution_time, exit_if_necessary, loa
     kill_process, get_separator, get_month_days
 from util.email_util import send_email
 from util.user_agent_util import get_random_ua
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 err_message = '请检查网络（代理、梯子等）是否正确.'
@@ -292,11 +293,14 @@ def set_email_by_strategy(config, local_data, logger, destination):
 
 
 def destination_handler(local_data):
-    print("恭喜，已经全部签到完成.")
+    print("恭喜，本月已经全部签到完成.")
     emailed = set_email_by_strategy(config, local_data, logger, True)
+    month = local_data.get('month')
+    _map = {f'{month}_destination': 1}
     if emailed is not None:
-        record(config, {'emailed': emailed})
-    kill_process()
+        _map['emailed'] = emailed
+    # kill_process()
+    record(config, _map)
 
 
 def redeem(config, clearing=False, local_data: dict = None, reloading=False):
@@ -432,11 +436,16 @@ def set_limit_time(local_data: dict):
 def wrapper(fn, p1, p2):
     def inner(event):
         return fn(event, p1, p2)
+
     return inner
 
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
 def check(printing: bool = True, local_data: dict = None):
+    month = local_data.get('month')
+    if local_data.get(f'{month}_destination') is not None:
+        print('---> {} 已全部签到完成.'.format(month))
+        return True
     now = datetime.datetime.utcnow()
     current_utc = now.strftime('%Y-%m-%d')
     print('---> 检查中...')
@@ -446,7 +455,7 @@ def check(printing: bool = True, local_data: dict = None):
             print('---> 即将执行签到.')
         return False
     if printing:
-        print('---> {} 签到已完成.'.format(local_data.get('date')))
+        print('---> {} 已签到完成.'.format(local_data.get('date')))
     return True
 
 

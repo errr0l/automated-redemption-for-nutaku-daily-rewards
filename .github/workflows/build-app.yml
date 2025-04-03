@@ -71,26 +71,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       # 2. 设置 QEMU 模拟器以支持 ARM 架构
       - name: Set up QEMU for ARM
         uses: docker/setup-qemu-action@v2
+
       # 设置 Python 3.9 的 ARM 环境
       - name: Set up Docker with Raspberry Pi image
-      run: |
-        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-        docker pull arm32v7/python:3.9
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          docker pull arm32v7/python:3.9
+
       # 在树莓派镜像中运行构建脚本
       - name: Build in Raspberry Pi image
-      run: |
-       docker run --rm -v $(pwd):/workspace -w /workspace arm32v7/python:3.9 bash -c "
-         apt-get update && \
-         apt-get install -y build-essential libffi-dev libssl-dev && \
-         python -m venv venv & \
-         source venv/bin/activate && \
-         pip install --upgrade pip && \
-         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \
-         pyinstaller main.spec"
-       "
+        run: |
+         docker run --rm -v $(pwd):/workspace -w /workspace arm32v7/python:3.9 bash -c "
+           apt-get update && \
+           apt-get install -y build-essential libffi-dev libssl-dev && \
+           python -m venv venv & \
+           source venv/bin/activate && \
+           pip install --upgrade pip && \
+           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \
+           pyinstaller main.spec"
+         "
       - name: Get Version
         id: get_version
         run: |

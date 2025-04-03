@@ -81,6 +81,7 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 
 ## 其他注意事项
 
+0. 环境为python3.9
 1. 本项目的工作流是基于tag，新增tag时，将会触发构建
 2. 此外，工作流需要使用到pat，请自行创建一个，并应用（Settings -> Secrets and variables -> Actions -> New repository secret，命名为PAT_FOR_WORKFLOWS）
 

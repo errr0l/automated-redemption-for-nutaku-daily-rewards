@@ -26,8 +26,6 @@ jobs:
   build-for-win:
     needs: create-release
     runs-on: windows-latest
-    env:
-      platform: "win"
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -52,7 +50,7 @@ jobs:
         id: create_zip
         run: |
           ren dist ${{ steps.get_version.outputs.version }}
-          $FILE_NAME="automated-redemption-for-$platform.zip"
+          $FILE_NAME="automated-redemption-for-win.zip"
           echo $FILE_NAME
           Write-Output "file_name=$FILE_NAME" >> $env:GITHUB_OUTPUT
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
@@ -69,22 +67,16 @@ jobs:
 
   build-for-linux-arm64:
     needs: create-release
-    runs-on: ubuntu-latest
-    env:
-      platform: "linux-arm64"
+    runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v3
-      # 安装交叉编译工具链
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
           python-version: "3.9"
       - name: Install dependencies
         run: |
+          uname -a
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Run PyInstaller
@@ -99,7 +91,7 @@ jobs:
         id: create_zip
         run: |
           mv dist ${{ steps.get_version.outputs.version }}
-          FILE_NAME="automated-redemption-for-$platform.zip"
+          FILE_NAME="automated-redemption-for-linux-arm64.zip"
           echo ::set-output name=file_name::$FILE_NAME
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
       - name: Upload Release Asset

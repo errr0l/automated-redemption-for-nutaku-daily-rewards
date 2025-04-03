@@ -1,11 +1,9 @@
-import datetime
-
 import requests
 import logging
 import sys
 import os
 import json
-from src.util.common import get_config, get_month_days
+from .common import get_config, get_month_days
 
 
 def send_email(config, data: dict, logger=None):

@@ -79,7 +79,18 @@ pyinstaller并非跨平台，需要在对应的系统上执行，如在mac上只
 
 > pip3 install -r requirements.txt
 
+## 其他注意事项
+
+0. 环境为python3.9
+1. 本项目的工作流是基于tag，新增tag时，将会触发构建
+2. 此外，工作流需要使用到pat，请自行创建一个，并应用（Settings -> Secrets and variables -> Actions -> New repository secret，命名为PAT_FOR_WORKFLOWS）
+3. 由于pyinstaller模块特性的缘故，只有在指定平台下运行才能输出相应的可执行程序，即它依赖于平台的软件、架构等，如果用户所在环境与预设（release）不一致，很可能会无法运行
+
 ## 更新日志
+
+2025-04
+
+1、将execution_mode为1时，由当月签到完成后退出程序，改为持续运行
 
 2024-11
 

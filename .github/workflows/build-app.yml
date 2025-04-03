@@ -1,12 +1,13 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: 将项目打包为可执行程序
+name: 构建执行程序
 
 on:
   push:
     tags:
       - v*
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
@@ -17,7 +18,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1.1.4
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_WORKFLOWS }}
         with:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
@@ -30,7 +31,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
-          python-version: "3.9.6"
+          python-version: "3.9"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -46,90 +47,74 @@ jobs:
           echo $VERSION
           Write-Output "version=$VERSION" >> $env:GITHUB_OUTPUT
       - name: Create Zip
+        id: create_zip
         run: |
-          rename dist ${{ steps.get_version.outputs.version }}
-          python -m zipfile -c automated-redemption-for-win.zip ${{ steps.get_version.outputs.version }}
+          ren dist ${{ steps.get_version.outputs.version }}
+          $FILE_NAME="automated-redemption-for-win.zip"
+          echo $FILE_NAME
+          Write-Output "file_name=$FILE_NAME" >> $env:GITHUB_OUTPUT
+          python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
       - name: Upload Release Asset
         id: upload_release_asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_WORKFLOWS }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: automated-redemption-for-win.zip
-          asset_name: automated-redemption-for-win.zip
+          asset_path: ${{ steps.create_zip.outputs.file_name }}
+          asset_name: ${{ steps.create_zip.outputs.file_name }}
           asset_content_type: application/zip
 
-#  build-for-linux:
-#    needs: create-release
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Set up Python
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: "3.9"
-#      - name: Install dependencies
-#        run: |
-#          python -m pip install --upgrade pip
-#          pip install -r requirements.txt
-#      - name: Run PyInstaller
-#        run: |
-#          python -m PyInstaller main.spec
-#      - name: Get Version
-#        id: get_version
-#        run: |
-#          VERSION=$(echo "${{ github.ref }}" | grep -oE 'v+[0-9]+(\.[0-9]+)*')
-#          echo ::set-output name=version::$VERSION
-#      - name: Print Upload Url
-#        run: |
-#          echo "${{ needs.create-release.outputs.upload_url }}"
-#      - name: Create Zip
-#        run: |
-#          python -m zipfile -c automated-redemption-for-linux.zip dist
-#      - name: Upload Release Asset
-#        id: upload_release_asset
-#        uses: actions/upload-release-asset@v1
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          upload_url: ${{ needs.create-release.outputs.upload_url }}
-#          asset_path: automated-redemption-for-linux.zip
-#          asset_name: automated-redemption-for-linux.zip
-#          asset_content_type: application/zip
-#
-#  build-for-mac:
-#    needs: create-release
-#    runs-on: macOS-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Set up Python
-#        uses: actions/setup-python@v3
-#        with:
-#          python-version: "3.9"
-#      - name: Install dependencies
-#        run: |
-#          python -m pip install --upgrade pip
-#          pip install -r requirements.txt
-#      - name: Run PyInstaller
-#        run: |
-#          python -m PyInstaller main.spec
-#      - name: Get Version
-#        id: get_version
-#        run: |
-#          VERSION=$(echo "${{ github.ref }}" | grep -oE 'v+[0-9]+(\.[0-9]+)*')
-#          echo VERSION
-#          echo ::set-output name=version::$VERSION
-#      - name: Create Zip
-#        run: |
-#          python -m zipfile -c automated-redemption-for-mac.zip dist
-#      - name: Upload Release Asset
-#        id: upload_release_asset
-#        uses: actions/upload-release-asset@v1
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          upload_url: ${{ needs.create-release.outputs.upload_url }}
-#          asset_path: automated-redemption-for-mac.zip
-#          asset_name: automated-redemption-for-mac.zip
-#          asset_content_type: application/zip
+  build-for-debian-arm64:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 设置 QEMU 模拟器以支持 ARM 架构
+      - name: Set up QEMU for ARM
+        uses: docker/setup-qemu-action@v2
+
+      # 设置 Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Verify QEMU installation
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      # 在树莓派镜像中运行构建脚本
+      - name: Build in Raspberry Pi image
+        run: |
+         docker run --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace arm64v8/python:3.9-bullseye bash -c "
+           apt-get update && \
+           apt-get install -y build-essential libffi-dev libssl-dev python3-venv && \
+           python3 -m venv venv && \
+           ls -la venv && \
+           source venv/bin/activate && \
+           pip install --upgrade pip && \
+           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \
+           pyinstaller main.spec"
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | grep -oE 'v+[0-9]+(\.[0-9]+)*')
+          echo ::set-output name=version::$VERSION
+      - name: Create Zip
+        id: create_zip
+        run: |
+          mv dist ${{ steps.get_version.outputs.version }}
+          FILE_NAME="automated-redemption-for-debian-arm64.zip"
+          echo ::set-output name=file_name::$FILE_NAME
+          python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
+      - name: Upload Release Asset
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_WORKFLOWS }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ steps.create_zip.outputs.file_name }}
+          asset_name: ${{ steps.create_zip.outputs.file_name }}
+          asset_content_type: application/zip

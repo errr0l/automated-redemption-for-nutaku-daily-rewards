@@ -87,7 +87,7 @@ jobs:
       # 在树莓派镜像中运行构建脚本
       - name: Build in Raspberry Pi image
         run: |
-         docker run --rm --platform linux/arm/v7 -v $(pwd):/workspace -w /workspace arm32v7/python:3.9-bullseye bash -c "
+         docker run --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace arm64v8/python:3.9-bullseye bash -c "
            apt-get update && \
            apt-get install -y build-essential libffi-dev libssl-dev python3-venv && \
            python3 -m venv venv && \
@@ -105,7 +105,7 @@ jobs:
         id: create_zip
         run: |
           mv dist ${{ steps.get_version.outputs.version }}
-          FILE_NAME="automated-redemption-for-linux-arm64.zip"
+          FILE_NAME="automated-redemption-for-debian-arm64.zip"
           echo ::set-output name=file_name::$FILE_NAME
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
       - name: Upload Release Asset

@@ -81,13 +81,12 @@ jobs:
             -v $(pwd):/workspace \
             -w /workspace \
             balenalib/rpi-alpine:latest \
-            sh -c "apk add --no-cache py3-pip && \
-                   apk add --no-cache python3=3.9 && \
-                   python3 -m venv venv && \
+            sh -c "apk add --no-cache py3-pip py3-virtualenv && \
+                   virtualenv --python=python3.9 venv && \
                    source venv/bin/activate && \
                    pip install --upgrade pip && \
                    pip install -r requirements.txt && \
-                   python3 -m PyInstaller main.spec"
+                   python -m PyInstaller main.spec"
       - name: Get Version
         id: get_version
         run: |

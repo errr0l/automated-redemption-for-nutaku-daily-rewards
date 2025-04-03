@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: 将项目打包为可执行程序
+name: Build for windows
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      platform: win
     steps:
       - name: Create Release
         id: create_release
@@ -22,7 +23,7 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
 
-  build-for-win:
+  build:
     needs: create-release
     runs-on: windows-latest
     steps:
@@ -46,9 +47,13 @@ jobs:
           echo $VERSION
           Write-Output "version=$VERSION" >> $env:GITHUB_OUTPUT
       - name: Create Zip
+        id: create_zip
         run: |
-          rename dist ${{ steps.get_version.outputs.version }}
-          python -m zipfile -c automated-redemption-for-win.zip ${{ steps.get_version.outputs.version }}
+          ren dist ${{ steps.get_version.outputs.version }}
+          $FILE_NAME=automated-redemption-for-${{ needs.create-release.outputs.platform }}.zip
+          echo $FILE_NAME
+          Write-Output "file_name=$FILE_NAME" >> $env:GITHUB_OUTPUT
+          python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
       - name: Upload Release Asset
         id: upload_release_asset
         uses: actions/upload-release-asset@v1
@@ -56,8 +61,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: automated-redemption-for-win.zip
-          asset_name: automated-redemption-for-win.zip
+          asset_path: ${{ steps.create_zip.outputs.file_name }}
+          asset_name: ${{ steps.create_zip.outputs.file_name }}
           asset_content_type: application/zip
 
 #  build-for-linux:

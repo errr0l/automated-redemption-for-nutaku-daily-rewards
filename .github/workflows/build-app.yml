@@ -27,7 +27,7 @@ jobs:
     needs: create-release
     runs-on: windows-latest
     env:
-      platform: win
+      platform: "win"
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -52,7 +52,7 @@ jobs:
         id: create_zip
         run: |
           ren dist ${{ steps.get_version.outputs.version }}
-          $FILE_NAME="automated-redemption-for-${{ platform }}.zip"
+          $FILE_NAME="automated-redemption-for-$platform.zip"
           echo $FILE_NAME
           Write-Output "file_name=$FILE_NAME" >> $env:GITHUB_OUTPUT
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
@@ -71,7 +71,7 @@ jobs:
     needs: create-release
     runs-on: ubuntu-latest
     env:
-      platform: linux-arm64
+      platform: "linux-arm64"
     steps:
       - uses: actions/checkout@v3
       # 安装交叉编译工具链
@@ -99,7 +99,7 @@ jobs:
         id: create_zip
         run: |
           mv dist ${{ steps.get_version.outputs.version }}
-          FILE_NAME="automated-redemption-for-${{ platform }}.zip"
+          FILE_NAME="automated-redemption-for-$platform.zip"
           echo ::set-output name=file_name::$FILE_NAME
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}
       - name: Upload Release Asset

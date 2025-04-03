@@ -244,7 +244,7 @@ def logging_in_handler(config, cookies, cookie_file_path, proxies, html_data, lo
             html_data = parse_html_for_data(home_resp.text)
             logger.info("html_data->{}".format(html_data))
             if html_data.get("destination"):
-                destination_handler(local_data)
+                destination_handler(local_data, config)
                 return
             if html_data.get("calendar_id") is not None:
                 print(success_message)
@@ -292,7 +292,7 @@ def set_email_by_strategy(config, local_data, logger, destination):
             print('---> 邮件通知发送失败，详细信息请查看日志.')
 
 
-def destination_handler(local_data):
+def destination_handler(local_data, config):
     print("恭喜，本月已经全部签到完成.")
     emailed = set_email_by_strategy(config, local_data, logger, True)
     month = local_data.get('month')
@@ -354,7 +354,7 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
         html_data = parse_html_for_data(home_resp.text)
         logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
-            destination_handler(local_data)
+            destination_handler(local_data, config)
             return
         # 未登陆或登陆已失效
         if html_data.get('calendar_id') is None:
@@ -511,7 +511,7 @@ def shutdown_handler(signum, frame):
     sys.exit(0)
 
 
-if __name__ == '__main__':
+def main():
     clear(True)
     current_dir = os.path.dirname(sys.argv[0])
     print('---> 当前目录为：' + current_dir)
@@ -540,7 +540,13 @@ if __name__ == '__main__':
     else:
         print_next_run_time(scheduler.get_job(job_id="001"))
     signal.signal(signal.SIGINT, shutdown_handler)
+    scheduler.start()
+
+
+if __name__ == '__main__':
     try:
-        scheduler.start()
-    except:
-        pass
+        main()
+    except Exception as e:
+        logger.error("An unexpected error occurred", exc_info=True)
+        logger.error()
+        sys.exit(1)

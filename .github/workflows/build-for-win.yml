@@ -7,12 +7,13 @@ on:
   push:
     tags:
       - v*
+env:
+  Platform: win
 jobs:
   create-release:
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      platform: win
     steps:
       - name: Create Release
         id: create_release
@@ -50,7 +51,7 @@ jobs:
         id: create_zip
         run: |
           ren dist ${{ steps.get_version.outputs.version }}
-          $FILE_NAME=automated-redemption-for-${{ needs.create-release.outputs.platform }}.zip
+          $FILE_NAME=automated-redemption-for-$Platform.zip
           echo $FILE_NAME
           Write-Output "file_name=$FILE_NAME" >> $env:GITHUB_OUTPUT
           python -m zipfile -c $FILE_NAME ${{ steps.get_version.outputs.version }}

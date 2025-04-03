@@ -85,8 +85,9 @@ jobs:
         run: |
          docker run --rm --platform linux/arm/v7 -v $(pwd):/workspace -w /workspace arm32v7/python:3.9 bash -c "
            apt-get update && \
-           apt-get install -y build-essential libffi-dev libssl-dev && \
-           python -m venv venv & \
+           apt-get install -y build-essential libffi-dev libssl-dev python3-venv && \
+           python3 -m venv venv & \
+           ls -la venv && \
            source venv/bin/activate && \
            pip install --upgrade pip && \
            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \

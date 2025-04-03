@@ -65,7 +65,7 @@ jobs:
           asset_name: ${{ steps.create_zip.outputs.file_name }}
           asset_content_type: application/zip
 
-  build-for-linux-arm64:
+  build-for-debian-arm64:
     needs: create-release
     runs-on: ubuntu-latest
     steps:
@@ -87,7 +87,7 @@ jobs:
       # 在树莓派镜像中运行构建脚本
       - name: Build in Raspberry Pi image
         run: |
-         docker run --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace arm64v8/python:3.9 bash -c "
+         docker run --rm --platform linux/arm/v7 -v $(pwd):/workspace -w /workspace arm32v7/python:3.9-bullseye bash -c "
            apt-get update && \
            apt-get install -y build-essential libffi-dev libssl-dev python3-venv && \
            python3 -m venv venv && \

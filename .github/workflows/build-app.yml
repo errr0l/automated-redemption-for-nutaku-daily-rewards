@@ -67,21 +67,21 @@ jobs:
 
   build-for-linux-arm64:
     needs: create-release
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.9"
-      - name: Install dependencies
+      - name: Checkout code
+        uses: actions/checkout@v3
+      # 2. 设置 QEMU 模拟器以支持 ARM 架构
+      - name: Set up QEMU for ARM
+        uses: docker/setup-qemu-action@v2
+      # 3. 使用树莓派兼容的 Docker 镜像构建可执行文件
+      - name: Build with Raspberry Pi Docker image
         run: |
-          uname -a
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run PyInstaller
-        run: |
-          python -m PyInstaller main.spec
+          docker run --rm \
+            -v $(pwd):/workspace \
+            -w /workspace \
+            balenalib/rpi-alpine:latest \
+            sh -c "python -m pip install --upgrade pip && pip install -r requirements.txt"
       - name: Get Version
         id: get_version
         run: |

@@ -81,7 +81,7 @@ jobs:
             -v $(pwd):/workspace \
             -w /workspace \
             balenalib/rpi-alpine:latest \
-            sh -c "pk add --no-cache py3-pip && \
+            sh -c "apk add --no-cache py3-pip && \
                    pip install --upgrade pip && \
                    pip install -r requirements.txt && \
                    python -m PyInstaller main.spec"

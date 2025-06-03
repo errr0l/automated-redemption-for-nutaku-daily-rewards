@@ -442,12 +442,13 @@ def wrapper(fn, p1, p2):
 
 # 检查任务是否已经执行；True表示已经签到，False表示未签到
 def check(printing: bool = True, local_data: dict = None):
-    month = local_data.get('month')
+    # month = local_data.get('month')
+    now = datetime.datetime.utcnow()
+    current_utc = now.strftime('%Y-%m-%d')
+    month = current_utc[:7]
     if local_data.get(f'{month}_destination') is not None:
         print('---> {} 已全部签到完成.'.format(month))
         return True
-    now = datetime.datetime.utcnow()
-    current_utc = now.strftime('%Y-%m-%d')
     print('---> 检查中...')
     utc_date = local_data.get('utc_date')
     if utc_date is None or utc_date != current_utc:

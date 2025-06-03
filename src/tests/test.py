@@ -119,20 +119,28 @@ if __name__ == '__main__':
     # print(now.month)
     # s1 = '123123'
     # print(s1.replace('12', 'abc'))
-    try:
-        # while True:
-        #     # 无限循环中的代码
-        #     time.sleep(10)
-        scheduler = BlockingScheduler()
-        scheduler.add_job(id="1", func=print_msg, args=("hello",), trigger="cron", hour=11, minute=46)
-        scheduler.start()
-    except Exception as e:
-        # print(e)
-        print("捕获到KeyboardInterrupt，正在退出...")
-    finally:
-        # 清理代码，比如关闭文件或释放资源
-        print("程序已退出。")
-    t1 = None
-
-    if t1:
-        print(1)
+    # now = datetime.datetime.now()
+    # month = now.strftime("%Y-%m")
+    now = datetime.datetime.utcnow()
+    current_utc = now.strftime('%Y-%m-%d')
+    print('---> 检查中...')
+    print(now.strftime("%Y-%m"))
+    print(current_utc)
+    print(current_utc[:7])
+    # try:
+    #     # while True:
+    #     #     # 无限循环中的代码
+    #     #     time.sleep(10)
+    #     scheduler = BlockingScheduler()
+    #     scheduler.add_job(id="1", func=print_msg, args=("hello",), trigger="cron", hour=11, minute=46)
+    #     scheduler.start()
+    # except Exception as e:
+    #     # print(e)
+    #     print("捕获到KeyboardInterrupt，正在退出...")
+    # finally:
+    #     # 清理代码，比如关闭文件或释放资源
+    #     print("程序已退出。")
+    # t1 = None
+    #
+    # if t1:
+    #     print(1)

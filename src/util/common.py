@@ -20,7 +20,7 @@ def get_config(config_dir, logger):
     config_file_path = config_dir + separator + "config.txt"
     logger.debug("配置文件路径为：" + config_file_path)
     if os.path.exists(config_file_path) is False:
-        print("---> 配置文件不存在或路径不正确，将退出程序.")
+        print("配置文件不存在或路径不正确，将退出程序.")
         time.sleep(3)
         kill_process()
     else:
@@ -39,17 +39,17 @@ def kill_process():
 
 
 # 如果为模式2时，签到完后，退出程序
-def exit_if_necessary(config, logger):
-    is_mode_2 = config.get('settings', 'execution_mode') == '2'
+def exit_if_necessary(config, logger, mode: str = None):
+    is_mode_2 = (mode if mode is not None else config.get('settings', 'execution_mode')) == '2'
     if is_mode_2:
-        print("---> 即将退出程序.")
+        print("即将退出程序.")
         time.sleep(3)
         kill_process()
 
 
 def load_data(config: dict, logger):
     data_file_path = config.get('sys', 'dir') + separator + 'data.json'
-    logger.debug("->加载本地数据.")
+    logger.debug("加载本地数据.")
     logger.debug("路径为：" + data_file_path)
     data = {}
     if os.path.exists(data_file_path):
@@ -57,7 +57,7 @@ def load_data(config: dict, logger):
             json_str = file.read()
             if len(json_str) > 0:
                 data = json.loads(json_str)
-    logger.debug("->{}".format(data))
+    logger.debug("{}.".format(data))
     return data
 
 

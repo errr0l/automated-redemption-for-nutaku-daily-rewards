@@ -7,6 +7,7 @@ from .common import get_config, get_month_days
 
 
 def send_email(config, data: dict, logger=None):
+    logger.info("发送邮件...")
     app_name = 'Automated Redemption'
     email = config.get('account', 'email')
     # content = f'当前账号金币为：{data.get("user_gold")}（若要关闭邮件通知，可在config.txt中将email_notification设为off）'
@@ -21,21 +22,20 @@ def send_email(config, data: dict, logger=None):
     try:
         resp = requests.post(url=f'{config.get("api", "email_notification")}',
                              json=_data, headers=headers, timeout=int(timeout))
-
         logger.debug(f'resp_text: {resp.text}')
         if resp.status_code == 200:
             resp_data = resp.json()
             if resp_data.get('code') == 0:
-                logger.debug("已成功发送邮件.")
+                logger.info("成功.")
                 return 1
             else:
-                logger.debug(f"发送邮件失败->{resp_data.get('message')}")
+                logger.info(f"失败, {resp_data.get('message')}")
                 return 2
         else:
-            logger.debug(f"发送邮件失败")
+            logger.info("失败.")
             return 2
     except Exception as e:
-        logger.debug(f"发送邮件失败，捕获异常->{e}")
+        logger.info(f"失败，捕获异常: {e}")
         return 2
 
 
@@ -70,8 +70,8 @@ def send_email(config, data: dict, logger=None):
 
 if __name__ == '__main__':
     current_dir = os.path.dirname(sys.argv[0])
-    print('---> 当前目录为：' + current_dir)
-    print('---> 读取配置文件.')
+    print('当前目录为：' + current_dir)
+    print('读取配置文件.')
 
     logging.basicConfig()
     logger = logging.getLogger(__name__)

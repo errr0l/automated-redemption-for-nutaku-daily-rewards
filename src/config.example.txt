@@ -8,7 +8,14 @@ password=你的密码
 [network]
 # 代理&梯子（on=启用；off=关闭）
 # 自动使用系统代理
-proxy=off
+proxy=on
+
+# 日志
+[log]
+# 日志级别（10=debug；20=info；30=warn；40=error）
+level=20
+# 输出位置（file=文件；console=控制台）
+output=file
 
 # 其他设置
 [settings]

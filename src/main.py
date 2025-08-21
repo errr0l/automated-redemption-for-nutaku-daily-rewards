@@ -8,6 +8,8 @@ import threading
 import time
 import signal
 import urllib.parse
+from configparser import RawConfigParser
+
 import urllib3
 from json import JSONDecodeError
 
@@ -20,6 +22,23 @@ from util.common import get_config, parse_execution_time, exit_if_necessary, loa
     kill_process, get_separator, get_month_days
 from util.email_util import send_email
 from util.user_agent_util import get_random_ua
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# 1. 定义重试策略
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[500, 502, 503, 504, 429],
+    method_whitelist=["POST", "GET"]  # 包括 POST
+)
+
+# 2. 创建适配器
+adapter = HTTPAdapter(max_retries=retry_strategy)
+
+# 3. 将适配器挂载到 requests 的全局 Session
+requests.Session().mount("http://", adapter)
+requests.Session().mount("https://", adapter)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -185,7 +204,6 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
         'email': config.get('account', 'email'),
         'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
         'month': _date,
-        'limit_str': local_data.get('limit').strftime(DATE_FORMAT),
         'current_gold': html_data.get('gold'),
         _date: local_data.get(_date), f'{_date}_total': html_data.get("total_gold")
     }
@@ -266,17 +284,15 @@ def destination_handler(local_data, config):
     _map = {f'{month}_destination': 1}
     if emailed is not None:
         _map['emailed'] = emailed
-    # kill_process()
     record(config, _map)
 
 
-def redeem(config, clearing=False, local_data: dict = None, reloading=False):
+def redeem(config: RawConfigParser, clearing=False, local_data: dict = None, reloading=False):
     # 重新加载数据
     if reloading:
         local_data = load_data(config, logger)
-    set_limit_time(local_data)
-    if clearing:
-        clear(True)
+        logger.info("加载本地数据，并挂载到config中")
+        config.set("local_data", "json", json.dumps(local_data))
     local_email = local_data.get('email')
     config_email = config.get('account', 'email')
     email_matched = True
@@ -284,6 +300,8 @@ def redeem(config, clearing=False, local_data: dict = None, reloading=False):
         logger.info('检测到账号发生变化: {}/{}，停止使用本地数据(cookie和用户数据).'.format(config_email, local_email))
         local_data.clear()
         email_matched = False
+    if clearing:
+        clear(True)
     if not check(True, local_data, email_matched):
         local_cookies = {}
         cookie_file_path = config.get('sys', 'dir') + separator + 'cookies.json'
@@ -352,59 +370,42 @@ def listener(event, sd, conf):
         if event.job_id == '001' or event.job_id == '002':
             exit_if_necessary(conf, logger)
     elif event.code == EVENT_JOB_ERROR:
-        today = datetime.datetime.today()
-        local_data = load_data(conf, logger)
-        limit_str = local_data.get('limit_str')
-        # 限制时间是第二天的早上8点，因此，一般情况下limit和today不在同一天；而如果处于同一天时，说明limit还没更新（比如没有请求n站成功就进入了重试逻辑）
-        limit = datetime.datetime.strptime(limit_str, DATE_FORMAT) if limit_str is not None else today
-        # 获取当前时间，加上时间间隔
-        next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
-        logger.info("当前时间：{}".format(today))
-        logger.info("截止日期：{}".format(limit))
-        matched = today.day == limit.day if limit is not None else False
         is_job_001 = event.job_id == '001'
         if is_job_001:
-            set_retrying_copying(conf, conf.get('settings', 'retrying'))
-        if matched:
-            logger.info("截止日期未更新.")
+            retrying = conf.get('settings', 'retrying')
+            set_retrying_copying(conf, retrying)
+            logger.info(f"设置任务重试次数: {retrying}")
+
+        retrying = conf.get('settings', 'retrying')
         _retrying = int(conf.get('settings', '_retrying'))
         if _retrying > 0:
             _retrying -= 1
+            # 获取当前时间，加上时间间隔
+            next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
             set_retrying_copying(conf, str(_retrying))
-            if limit is None or next_time < limit or not matched:
-                print(f'请求失败，将会在{next_time}进行重试.')
-                # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
-                if is_job_001:
-                    job = sd.get_job('002')
-                    if job is not None:
-                        sd.remove_job('002')
-                sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
-                           args=[conf, False, local_data],
-                           misfire_grace_time=conf.getint('settings', 'misfire_grace_time') * 60)
-            else:
-                date_format = '{}-{}-{}'.format(today.year, today.month, today.day)
-                print('{} 签到失败.'.format(date_format))
-                exit_if_necessary(conf, logger)
+            print(f'请求失败，将会在{next_time}进行重试[第{int(retrying) - _retrying}次].')
+            # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
+            if is_job_001:
+                job = sd.get_job('002')
+                if job is not None:
+                    sd.remove_job('002')
+            local_data = json.loads(conf.get("local_data", "json"))
+            logger.info(f"从config中读取local_data: {local_data}")
+            sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
+                       args=[conf, False, local_data, False],
+                       misfire_grace_time=conf.getint('settings', 'misfire_grace_time') * 60)
         else:
-            print('已到达最大重试次数，如本日签到还未完成时，还请手动签到.')
-            exit_if_necessary(conf, logger)
+            mode = conf.get('settings', 'execution_mode')
+            if mode == '1':
+                print('当前时间点已到达最大重试次数，若最后的时间点仍未能完成签到时，还请手动签到.')
+            else:
+                print('到达最大重试次数，如本日签到还未完成时，还请手动签到.')
+            exit_if_necessary(conf, logger, mode)
 
 
 def get_next_time(minutes):
     next_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
     return next_time
-
-
-# 设置签到截止日期
-def set_limit_time(local_data: dict):
-    today = datetime.datetime.today()
-    # 获取第二天早上8点0分0秒的时间，即utc+0的00:00:00，若当前时间已经超过该时间点，将不再执行
-    # limit是相对于today_000的时间
-    today_000 = today.replace(hour=0, minute=0, second=0)
-    limit = today_000 + datetime.timedelta(days=1, hours=8)
-    _limit = local_data.get("limit")
-    if _limit != limit:
-        local_data['limit'] = limit
 
 
 def wrapper(fn, p1, p2):
@@ -500,7 +501,11 @@ def main():
     print('读取配置文件...')
     config = get_config(current_dir, logger)
     config.add_section('sys')
+    logger.info("添加sys配置项")
     config.set('sys', 'dir', current_dir)
+    logger.info(f"设置config.sys.dir: {current_dir}")
+    config.add_section("local_data")
+    logger.info("添加local_data配置项")
     set_retrying_copying(config, config.get('settings', 'retrying'))
     print(messages[0])
     mode = config.get('settings', 'execution_mode')

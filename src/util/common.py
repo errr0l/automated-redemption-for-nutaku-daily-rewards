@@ -39,8 +39,8 @@ def kill_process():
 
 
 # 如果为模式2时，签到完后，退出程序
-def exit_if_necessary(config, logger):
-    is_mode_2 = config.get('settings', 'execution_mode') == '2'
+def exit_if_necessary(config, logger, mode: str = None):
+    is_mode_2 = (mode if mode is not None else config.get('settings', 'execution_mode')) == '2'
     if is_mode_2:
         print("即将退出程序.")
         time.sleep(3)

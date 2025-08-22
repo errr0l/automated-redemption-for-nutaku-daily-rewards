@@ -18,8 +18,8 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 
-from util.common import get_config, parse_execution_time, exit_if_necessary, load_data, clear, \
-    kill_process, get_separator, get_month_days
+from util.common import get_config, parse_execution_time, exit_if_necessary, clear, \
+    kill_process, get_separator, get_month_days, load_json, save_json
 from util.email_util import send_email
 from util.user_agent_util import get_random_ua
 from requests.adapters import HTTPAdapter
@@ -30,7 +30,7 @@ retry_strategy = Retry(
     total=3,
     backoff_factor=1,
     status_forcelist=[500, 502, 503, 504, 429],
-    method_whitelist=["POST", "GET"]  # 包括 POST
+    method_whitelist=["POST", "GET"]
 )
 
 # 2. 创建适配器
@@ -57,7 +57,6 @@ def build_headers(type, cookies):
         'Origin': 'https://www.nutaku.net',
         "Cookie": urllib.parse.urlencode(cookies).replace("&", ";") if cookies is not None else ""
     }
-
     # ajax请求
     if type == 1:
         headers['Content-Type'] = "application/x-www-form-urlencoded; charset=UTF-8"
@@ -81,6 +80,7 @@ def get_rewards_calendar(cookies, html_data):
             logger.debug("resp_data: {}".format(resp_data))
             current_gold = 0
             total_gold = 0
+            claimed = 0
             if resp_data.get('id') is None:
                 logger.info(messages[1])
                 return None
@@ -89,13 +89,17 @@ def get_rewards_calendar(cookies, html_data):
                     gold = int(item['slotTitle'].replace("Gold", "").strip())
                     total_gold += gold
                     # 当日没签到时为current-not-claimed，签到后为current-claimed
-                    if item['status'] == 'current-not-claimed' and current_gold == 0:
-                        current_gold = gold
+                    if item['status'] == 'current-not-claimed':
+                        if current_gold == 0:
+                            current_gold = gold
+                    elif item['status'] == 'claimed':
+                        claimed += gold
             html_data['destination'] = resp_data['areAllRewardClaimed']
             html_data['gold'] = current_gold
             html_data['total_gold'] = total_gold
             html_data['calendar_id'] = resp_data.get('id')
             html_data['is_reward_claimed'] = resp_data['isRewardClaimed']
+            html_data['claimed'] = claimed
             return 1
         except JSONDecodeError:
             logger.error(messages[1])
@@ -158,7 +162,7 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
         # 获取本月金币
         month = data.get('month')
         monthly_amount = data.get(month)
-        data[month] = (data.get('current_gold') + int(monthly_amount)) if monthly_amount is not None else data.get(
+        data[month] = (data.get('current_gold') + monthly_amount) if monthly_amount is not None else data.get(
             'current_gold')
         print(f"当前金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}\n")
         _content = f"当前账号金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}"
@@ -173,26 +177,10 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
 
 
 def record(config, data):
-    logger.info("保存数据至data.json")
-    data_file_path = config.get('sys', 'dir') + separator + 'data.json'
-    logger.info("路径: {}".format(data_file_path))
-    # 创建文件
-    if os.path.exists(data_file_path) is False:
-        with open(data_file_path, 'w'):
-            pass
-    with open(data_file_path, 'r+') as _file:
-        json_str = _file.read()
-        is_not_empty = len(json_str) > 0
-        merged = {**(json.loads(json_str) if is_not_empty else {}), **data}
-        logger.debug("data: {}".format(merged))
-        # 清空文件内容，再重新写入
-        if is_not_empty:
-            _file.seek(0)
-            _file.truncate()
-        json.dump(merged, _file)
+    save_json(config, "data.json", data, logger)
 
 
-def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
+def getting_rewards_handler(cookies, proxies, config, html_data, user_data):
     print("开始签到...")
     reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
     logger.debug("resp_data->{}".format(reward_resp_data))
@@ -202,16 +190,15 @@ def getting_rewards_handler(cookies, proxies, config, html_data, local_data):
     data = {
         'date': now.strftime('%Y-%m-%d'),
         'email': config.get('account', 'email'),
-        'utc_date': datetime.datetime.utcnow().strftime('%Y-%m-%d'),
         'month': _date,
         'current_gold': html_data.get('gold'),
-        _date: local_data.get(_date), f'{_date}_total': html_data.get("total_gold")
+        _date: html_data.get('claimed'), f'{_date}_total': html_data.get("total_gold")
     }
     if reward_resp_data is None:
         logger.info("重复签到或签到失败(多为前者).")
         return
     reward_resp_data_handler(reward_resp_data, data)
-    emailed = set_email_by_strategy(config, {**local_data, **data}, logger, False)
+    emailed = set_email_by_strategy(config, {**user_data, **data}, logger, False)
     if emailed is not None:
         data['emailed'] = emailed
     record(config, data)
@@ -247,18 +234,18 @@ def login(config, cookies, proxies, csrf_token):
 
 
 # 默认情况下，全部签到完成后，会发一次邮件（如果近期内未通知时）；
-def set_email_by_strategy(config, local_data, logger, destination):
+def set_email_by_strategy(config, user_data, logger, destination):
     if config.get('settings', 'email_notification') == 'on':
         strategy = config.get('settings', 'email_notification_strategy')
         now = datetime.datetime.now()
-        _date = local_data.get("emailed", '')
+        _date = user_data.get("emailed", '')
         _map = {'day': 1, 'week': 7}
         interval = _map.get(strategy)
         if destination:
-            local_data['content'] = '本月签到已全部完成，' + local_data.get('content').replace('本月', '')
+            user_data['content'] = '本月签到已全部完成，' + user_data.get('content').replace('本月', '')
         r = 0
         if _date == '':
-            r = send_email(config, local_data, logger)
+            r = send_email(config, user_data, logger)
         else:
             _date = [int(item) for item in _date.split("-")]
             # 年份不同暂不考虑；
@@ -266,9 +253,9 @@ def set_email_by_strategy(config, local_data, logger, destination):
             if _date[1] != now.month:
                 last_month_days = get_month_days(_date[1], _date[0])
                 if (last_month_days - _date[2] + now.day) >= interval:
-                    r = send_email(config, local_data, logger)
+                    r = send_email(config, user_data, logger)
             elif now.day - _date[2] >= interval:
-                r = send_email(config, local_data, logger)
+                r = send_email(config, user_data, logger)
         if r == 1:
             _time = now.strftime('%Y-%m-%d')
             print('邮件通知已发送.')
@@ -277,46 +264,34 @@ def set_email_by_strategy(config, local_data, logger, destination):
             print('邮件通知发送失败，详细信息请查看日志.')
 
 
-def destination_handler(local_data, config):
+def destination_handler(user_data, config):
     print("恭喜，本月已经全部签到完成.")
-    emailed = set_email_by_strategy(config, local_data, logger, True)
-    month = local_data.get('month')
-    _map = {f'{month}_destination': 1}
+    emailed = set_email_by_strategy(config, user_data, logger, True)
     if emailed is not None:
-        _map['emailed'] = emailed
-    record(config, _map)
+        _map = {'emailed': emailed}
+        record(config, _map)
 
 
-def redeem(config: RawConfigParser, clearing=False, local_data: dict = None, reloading=False):
+def redeem(config: RawConfigParser, clearing=False, local_store: dict = None, reloading=False):
+    email = config.get('account', 'email')
     # 重新加载数据
     if reloading:
-        local_data = load_data(config, logger)
+        local_store = load_json(config, "data.json", logger)
         logger.info("加载本地数据，并挂载到config中")
-        config.set("local_data", "json", json.dumps(local_data))
-    local_email = local_data.get('email')
-    config_email = config.get('account', 'email')
-    email_matched = True
-    if local_email is not None and local_email != config_email:
-        logger.info('检测到账号发生变化: {}/{}，停止使用本地数据(cookie和用户数据).'.format(config_email, local_email))
-        local_data.clear()
-        email_matched = False
+        config.set("local_store", "json", json.dumps(local_store))
+    user_data = local_store.get(email, {})
+    logger.info(f"[{email}]user_data: {user_data}")
+    is_empty = len(user_data) == 0
     if clearing:
         clear(True)
-    if not check(True, local_data, email_matched):
+    if not check(True, user_data, is_empty):
         local_cookies = {}
-        cookie_file_path = config.get('sys', 'dir') + separator + 'cookies.json'
-        # 邮箱相同时, 使用本地cookie
-        if email_matched:
+        # 如果为已保存邮箱, 使用本地cookie
+        if not is_empty and email in local_store.get("emails", ""):
             logger.info("读取本地cookie.")
-            if os.path.exists(cookie_file_path):
-                with open(cookie_file_path, 'r') as file:
-                    json_str = file.read()
-                    if len(json_str) > 0:
-                        local_cookies = json.loads(json_str)
-                    else:
-                        logger.info('cookie文件内容为空.')
-            else:
-                logger.info('本地cookie不存在.')
+            local_cookie_store = load_json(config, "cookies.json", logger)
+            local_cookies = local_cookie_store.get(email, {})
+            logger.info(f"[{email}]cookie: {local_cookies}")
         proxies = {}
         if config.get('network', 'proxy') == 'off':
             # 可以这样设置是因为，当前所有的接口都是该域名下的
@@ -328,6 +303,7 @@ def redeem(config: RawConfigParser, clearing=False, local_data: dict = None, rel
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
         merged = {**local_cookies, **home_resp.cookies.get_dict()}
+        # merged = {}
         html_data = parse_html_for_data(home_resp.text)
         print("拉取签到数据...")
         result = get_rewards_calendar(cookies=merged, html_data=html_data)
@@ -339,11 +315,10 @@ def redeem(config: RawConfigParser, clearing=False, local_data: dict = None, rel
             else:
                 print('登陆...')
             # 登陆返回的cookie包含Nutaku_TOKEN
-            login_cookies = login(config=config, cookies=merged, proxies=proxies, csrf_token=html_data.get("csrf_token"))
+            login_cookies = login(config=config, cookies=merged, proxies=proxies,
+                                  csrf_token=html_data.get("csrf_token"))
             if login_cookies is not None:
-                logger.debug("login_resp_data->{}".format(login_cookies))
-                with open(cookie_file_path, 'w') as _file:
-                    json.dump(login_cookies, _file)
+                save_json(config, "cookies.json", login_cookies, logger)
             else:
                 print("失败，账号&密码错误或" + messages[2] + ", 之后重新运行程序.")
                 kill_process()
@@ -355,13 +330,13 @@ def redeem(config: RawConfigParser, clearing=False, local_data: dict = None, rel
                 raise RuntimeError(messages[2])
         logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
-            destination_handler(local_data, config)
+            destination_handler(user_data, config)
             return
         if html_data['is_reward_claimed']:
             print("今日已签到.")
             return
         getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config,
-                                local_data=local_data)
+                                user_data=user_data)
 
 
 def listener(event, sd, conf):
@@ -389,10 +364,10 @@ def listener(event, sd, conf):
                 job = sd.get_job('002')
                 if job is not None:
                     sd.remove_job('002')
-            local_data = json.loads(conf.get("local_data", "json"))
-            logger.info(f"从config中读取local_data: {local_data}")
+            local_store = json.loads(conf.get("local_store", "json"))
+            logger.info(f"从config中读取local_store: {local_store}")
             sd.add_job(id='002', func=redeem, trigger='date', next_run_time=next_time,
-                       args=[conf, False, local_data, False],
+                       args=[conf, False, local_store, False],
                        misfire_grace_time=conf.getint('settings', 'misfire_grace_time') * 60)
         else:
             mode = conf.get('settings', 'execution_mode')
@@ -403,8 +378,8 @@ def listener(event, sd, conf):
             exit_if_necessary(conf, logger, mode)
 
 
-def get_next_time(minutes):
-    next_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+def get_next_time(value):
+    next_time = datetime.datetime.now() + datetime.timedelta(seconds=value)
     return next_time
 
 
@@ -416,27 +391,27 @@ def wrapper(fn, p1, p2):
 
 # 检查任务是否需要执行；1）账号，2）日期
 # True表示已经签到，False表示未签到
-def check(printing: bool = True, local_data: dict = None, email_matched: bool = False):
-    if not email_matched:
+def check(printing: bool = True, user_data: dict = None, is_empty: bool = False):
+    if is_empty:
         if printing:
             logger.info('即将执行签到.')
         return False
-    now = datetime.datetime.utcnow()
-    current_utc = now.strftime('%Y-%m-%d')
-    month = current_utc[:7]
-    if local_data.get(f'{month}_destination') is not None:
+    now = datetime.datetime.now()
+    current_date = now.strftime('%Y-%m-%d')
+    month = current_date[:7]
+    if user_data.get(f'{month}_total') == user_data.get(f"{month}"):
         msg = '{} 已全部签到完成.'.format(month)
         print(msg)
         logger.info(msg)
         return True
     logger.info('检查中...')
-    utc_date = local_data.get('utc_date')
-    if utc_date is None or utc_date != current_utc:
+    date = user_data.get('date')
+    if date is None or date != current_date:
         if printing:
             logger.info('即将执行签到.')
         return False
     if printing:
-        msg = '{} 已签到完成.'.format(local_data.get('date'))
+        msg = '{} 已签到完成.'.format(current_date)
         logger.info(msg)
         print(msg)
     return True
@@ -450,7 +425,7 @@ def get_dict_params(mode, execution_time):
         params['trigger'] = 'cron'
     else:
         params['trigger'] = 'date'
-        params['next_run_time'] = get_next_time(1)
+        params['next_run_time'] = get_next_time(30)
     return params
 
 
@@ -481,7 +456,6 @@ def print_next_run_time(job):
             _timedelta = datetime.timedelta(
                 hours=_hour - now.hour,
                 minutes=(int(_minutes[0]) if len(_minutes) == 1 else int(_minutes[i])) - now.minute)
-
             print(f"预计执行时间：{now + _timedelta} (in {_timedelta.seconds}s)")
             break
 
@@ -504,8 +478,8 @@ def main():
     logger.info("添加sys配置项")
     config.set('sys', 'dir', current_dir)
     logger.info(f"设置config.sys.dir: {current_dir}")
-    config.add_section("local_data")
-    logger.info("添加local_data配置项")
+    config.add_section("local_store")
+    logger.info("添加local_store配置项")
     set_retrying_copying(config, config.get('settings', 'retrying'))
     print(messages[0])
     mode = config.get('settings', 'execution_mode')

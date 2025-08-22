@@ -47,18 +47,48 @@ def exit_if_necessary(config, logger, mode: str = None):
         kill_process()
 
 
-def load_data(config: dict, logger):
-    data_file_path = config.get('sys', 'dir') + separator + 'data.json'
-    logger.debug("加载本地数据.")
-    logger.debug("路径为：" + data_file_path)
-    data = {}
-    if os.path.exists(data_file_path):
-        with open(data_file_path, 'r') as file:
+def load_json(config: dict, filename: str, logger):
+    logger.debug("加载json数据.")
+    file_path = config.get('sys', 'dir') + separator + filename
+    logger.debug("路径为：" + file_path)
+    result = {}
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
             json_str = file.read()
             if len(json_str) > 0:
-                data = json.loads(json_str)
-    logger.debug("{}.".format(data))
-    return data
+                result = json.loads(json_str)
+    logger.debug("{}.".format(result))
+    return result
+
+
+def save_json(config: dict, filename: str, data, logger):
+    logger.debug("保存json数据.")
+    file_path = config.get('sys', 'dir') + separator + filename
+    logger.debug("路径为：" + file_path)
+    # 创建文件
+    if os.path.exists(file_path) is False:
+        with open(file_path, 'w'):
+            pass
+    with open(file_path, 'r+') as _file:
+        json_str = _file.read()
+        is_not_empty = len(json_str) > 0
+        result = json.loads(json_str) if is_not_empty else {}
+        key = config.get("account", "email")
+        user_data = result.get(key)
+        if user_data is None:
+            result[key] = data
+        else:
+            result[key] = {**user_data, **data}
+        logger.debug("user_data: {}".format(user_data))
+        # 记录邮箱
+        emails = result.get("emails", "")
+        if key not in emails:
+            result['emails'] = key if len(emails) == 0 else f"{emails},{key}"
+        # 清空文件内容，再重新写入
+        if is_not_empty:
+            _file.seek(0)
+            _file.truncate()
+        json.dump(result, _file)
 
 
 def clear(tips: bool):

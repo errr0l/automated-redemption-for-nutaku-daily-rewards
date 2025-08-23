@@ -303,7 +303,6 @@ def redeem(config: RawConfigParser, clearing=False, local_store: dict = None, re
         home_resp = get_nutaku_home(cookies=local_cookies, proxies=proxies, config=config)
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
         merged = {**local_cookies, **home_resp.cookies.get_dict()}
-        # merged = {}
         html_data = parse_html_for_data(home_resp.text)
         print("拉取签到数据...")
         result = get_rewards_calendar(cookies=merged, html_data=html_data)

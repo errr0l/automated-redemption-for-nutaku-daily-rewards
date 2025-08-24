@@ -464,7 +464,21 @@ def set_retrying_copying(conf, value):
 
 
 def shutdown_handler(signum, frame):
+    logger.info(f"👋 收到退出信号 {signal.Signals(signum).name}...")
+    print("退出程序.")
     sys.exit(0)
+
+
+def config_logger(config, current_dir):
+    filename = None
+    log_level = logging.INFO
+    if config.has_section("log"):
+        log_output = config.get("log", 'output')
+        log_level = int(config.get("log", 'level'))
+        if log_output == "file":
+            filename = f'{current_dir}/app.log'
+    logger.setLevel(level=log_level)
+    logging.basicConfig(filename=filename, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
 def main():
@@ -482,13 +496,7 @@ def main():
     set_retrying_copying(config, config.get('settings', 'retrying'))
     print(messages[0])
     mode = config.get('settings', 'execution_mode')
-    log_output = config.get("log", 'output')
-    log_level = int(config.get("log", 'level'))
-    if log_output == "file":
-        logging.basicConfig(filename=f'{current_dir}/app.log', format='%(asctime)s - %(levelname)s - %(message)s')
-    elif log_output == 'console':
-        logging.basicConfig( format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger.setLevel(level=log_level)
+    config_logger(config, current_dir)
     scheduler = BlockingScheduler(option={'logger': logger})
     execution_time = parse_execution_time(config.get('settings', 'execution_time'))
 
@@ -503,13 +511,16 @@ def main():
         jobs_checker_thread.start()
     else:
         print_next_run_time(scheduler.get_job(job_id="001"))
-    signal.signal(signal.SIGINT, shutdown_handler)
     scheduler.start()
 
 
+signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGTERM, shutdown_handler)
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        logger.info("👋 程序已退出.")
     except Exception as e:
         logger.error("An unexpected error occurred", exc_info=True)
         sys.exit(1)

@@ -6,8 +6,12 @@ import time
 import platform
 
 
+def get_platform():
+    return platform.system()
+
+
 def get_separator():
-    _system = platform.system()
+    _system = get_platform()
     return "\\" if _system == 'Windows' else '/'
 
 
@@ -19,12 +23,13 @@ def get_config(config_dir, logger):
     config = configparser.ConfigParser()
     config_file_path = config_dir + separator + "config.txt"
     logger.debug("配置文件路径为：" + config_file_path)
+    _system = get_platform()
     if os.path.exists(config_file_path) is False:
         print("配置文件不存在或路径不正确，将退出程序.")
         time.sleep(3)
         kill_process()
     else:
-        config.read(config_file_path, encoding="utf-8")
+        config.read(config_file_path, encoding='utf-8-sig' if _system == 'Windows' else "utf-8")
     return config
 
 

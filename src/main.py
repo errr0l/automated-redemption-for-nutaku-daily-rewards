@@ -100,6 +100,7 @@ def get_rewards_calendar(cookies, html_data):
             html_data['calendar_id'] = resp_data.get('id')
             html_data['is_reward_claimed'] = resp_data['isRewardClaimed']
             html_data['claimed'] = claimed
+            html_data['days'] = len(resp_data["rewards"])
             return 1
         except JSONDecodeError:
             logger.error(messages[1])
@@ -165,6 +166,7 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
         data[month] = (data.get('current_gold') + monthly_amount) if monthly_amount is not None else data.get(
             'current_gold')
         print(f"当前金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}\n")
+        data['destination'] = data[month] == data.get(f'{month}_total')
         _content = f"当前账号金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}"
         data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
@@ -192,13 +194,16 @@ def getting_rewards_handler(cookies, proxies, config, html_data, user_data):
         'email': config.get('account', 'email'),
         'month': _date,
         'current_gold': html_data.get('gold'),
-        _date: html_data.get('claimed'), f'{_date}_total': html_data.get("total_gold")
+        _date: html_data.get('claimed'), f'{_date}_total': html_data.get("total_gold"),
+        # 月签到天数
+        f'{_date}_days': html_data.get("days"),
+        'destination': False
     }
     if reward_resp_data is None:
         logger.info("重复签到或签到失败(多为前者).")
         return
     reward_resp_data_handler(reward_resp_data, data)
-    emailed = set_email_by_strategy(config, {**user_data, **data}, logger, False)
+    emailed = set_email_by_strategy(config, {**user_data, **data}, logger, data['destination'])
     if emailed is not None:
         data['emailed'] = emailed
     record(config, data)

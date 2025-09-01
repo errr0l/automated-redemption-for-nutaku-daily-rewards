@@ -25,7 +25,9 @@ def get_config(config_dir, logger):
     logger.debug("配置文件路径为：" + config_file_path)
     _system = get_platform()
     if os.path.exists(config_file_path) is False:
-        print("配置文件不存在或路径不正确，将退出程序.")
+        msg = "配置文件不存在或路径不正确，将退出程序."
+        print(msg)
+        logger.debug(msg)
         time.sleep(3)
         kill_process()
     else:
@@ -38,6 +40,7 @@ def parse_execution_time(execution_time: str):
     return {'hours': hours, 'minutes': minutes}
 
 
+# 关闭窗口
 def kill_process():
     pid = os.getpid()
     os.kill(pid, signal.SIGTERM)
@@ -47,7 +50,7 @@ def kill_process():
 def exit_if_necessary(config, logger, mode: str = None):
     is_mode_2 = (mode if mode is not None else config.get('settings', 'execution_mode')) == '2'
     if is_mode_2:
-        print("即将退出程序.")
+        print("即将退出程序...")
         time.sleep(3)
         kill_process()
 

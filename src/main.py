@@ -165,16 +165,16 @@ def reward_resp_data_handler(resp_data: dict, data: dict):
         monthly_amount = data.get(month)
         data[month] = (data.get('current_gold') + monthly_amount) if monthly_amount is not None else data.get(
             'current_gold')
-        print(f"当前金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}\n")
+        output_msg(f"当前金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}\n")
         data['destination'] = data[month] == data.get(f'{month}_total')
         _content = f"当前账号金币：{item}，本月累计领取：{data[month]}/{data.get(f'{month}_total')}"
         data['user_gold'] = item
     elif resp_data.get('coupon') is not None:
         item = resp_data.get('coupon')
         _content = "获取到优惠卷：{}/{}".format(item.get('title'), item.get('code'))
-        print(_content)
+        output_msg(_content)
     else:
-        print(_content)
+        output_msg(_content)
     data['content'] = _content
 
 
@@ -183,7 +183,7 @@ def record(config, data):
 
 
 def getting_rewards_handler(cookies, proxies, config, html_data, user_data):
-    print("开始签到...")
+    output_msg("开始签到...")
     reward_resp_data = get_rewards(cookies=cookies, html_data=html_data, proxies=proxies, config=config)
     logger.debug("resp_data->{}".format(reward_resp_data))
 
@@ -200,8 +200,10 @@ def getting_rewards_handler(cookies, proxies, config, html_data, user_data):
         'destination': False
     }
     if reward_resp_data is None:
-        logger.info("重复签到或签到失败(多为前者).")
+        output_msg("重复签到或签到失败(多为前者).")
         return
+    else:
+        output_msg(messages[0])
     reward_resp_data_handler(reward_resp_data, data)
     emailed = set_email_by_strategy(config, {**user_data, **data}, logger, data['destination'])
     if emailed is not None:
@@ -263,14 +265,14 @@ def set_email_by_strategy(config, user_data, logger, destination):
                 r = send_email(config, user_data, logger)
         if r == 1:
             _time = now.strftime('%Y-%m-%d')
-            print('邮件通知已发送.')
+            output_msg('邮件通知已发送.')
             return _time
         elif r == 2:
-            print('邮件通知发送失败，详细信息请查看日志.')
+            output_msg('邮件通知发送失败，详细信息请查看日志.')
 
 
 def destination_handler(user_data, config):
-    print("恭喜，本月已经全部签到完成.")
+    output_msg("恭喜，本月已经全部签到完成.")
     emailed = set_email_by_strategy(config, user_data, logger, True)
     if emailed is not None:
         _map = {'emailed': emailed}
@@ -309,35 +311,35 @@ def redeem(config: RawConfigParser, clearing=False, local_store: dict = None, re
         # 合并cookie，以使用新的XSRF-TOKEN、NUTAKUID
         merged = {**local_cookies, **home_resp.cookies.get_dict()}
         html_data = parse_html_for_data(home_resp.text)
-        print("拉取签到数据...")
+        logger.info("拉取签到数据...")
         result = get_rewards_calendar(cookies=merged, html_data=html_data)
         # 未登陆或登陆已失效
         if result is None:
-            print('失败, 未登陆或登陆过期.')
+            logger.info('失败, 未登陆或登陆过期.')
             if local_cookies.get('Nutaku_TOKEN') is not None:
-                print('尝试重新登陆...')
+                logger.info('尝试重新登陆...')
             else:
-                print('登陆...')
+                logger.info('登陆...')
             # 登陆返回的cookie包含Nutaku_TOKEN
             login_cookies = login(config=config, cookies=merged, proxies=proxies,
                                   csrf_token=html_data.get("csrf_token"))
             if login_cookies is not None:
                 save_json(config, "cookies.json", login_cookies, logger)
             else:
-                print("失败，账号&密码错误或" + messages[2] + ", 之后重新运行程序.")
+                logger.info("失败，账号&密码错误或" + messages[2] + ", 之后重新运行程序.")
                 kill_process()
                 return
             merged = {**merged, **login_cookies}
             result = get_rewards_calendar(cookies=merged, html_data=html_data)
             if result is None:
-                print("拉取签到数据...")
+                logger.info("拉取签到数据...")
                 raise RuntimeError(messages[2])
         logger.debug("html_data->{}".format(html_data))
         if html_data.get("destination"):
             destination_handler(user_data, config)
             return
         if html_data['is_reward_claimed']:
-            print("今日已签到.")
+            output_msg("今日已签到.")
             return
         getting_rewards_handler(cookies=merged, html_data=html_data, proxies=proxies, config=config,
                                 user_data=user_data)
@@ -362,7 +364,7 @@ def listener(event, sd, conf):
             # 获取当前时间，加上时间间隔
             next_time = get_next_time(int(conf.get('settings', 'retrying_interval')))
             set_retrying_copying(conf, str(_retrying))
-            print(f'请求失败，将会在{next_time}进行重试[第{int(retrying) - _retrying}次].')
+            output_msg(f'请求失败，将会在{next_time}进行重试[第{int(retrying) - _retrying}次].')
             # 如果是001时，删除002任务，以免出现冲突，即如果id=001的任务出现错误时，还在等待中的id=002的任务将会被清除
             if is_job_001:
                 job = sd.get_job('002')
@@ -376,9 +378,9 @@ def listener(event, sd, conf):
         else:
             mode = conf.get('settings', 'execution_mode')
             if mode == '1':
-                print('当前时间点已到达最大重试次数，若最后的时间点仍未能完成签到时，还请手动签到.')
+                output_msg('当前时间点已到达最大重试次数，若最后的时间点仍未能完成签到时，还请手动签到.')
             else:
-                print('到达最大重试次数，如本日签到还未完成时，还请手动签到.')
+                output_msg('到达最大重试次数，如本日签到还未完成时，还请手动签到.')
             exit_if_necessary(conf, logger, mode)
 
 
@@ -393,6 +395,13 @@ def wrapper(fn, p1, p2):
     return inner
 
 
+def output_msg(msg, log: bool = True, printing: bool = True):
+    if printing:
+        print(msg)
+    if log:
+        logger.info(msg)
+
+
 # 检查任务是否需要执行；1）账号，2）日期
 # True表示已经签到，False表示未签到
 def check(printing: bool = True, user_data: dict = None, is_empty: bool = False):
@@ -403,21 +412,18 @@ def check(printing: bool = True, user_data: dict = None, is_empty: bool = False)
     now = datetime.datetime.now()
     current_date = now.strftime('%Y-%m-%d')
     month = current_date[:7]
-    if user_data.get(f'{month}_total') == user_data.get(f"{month}"):
-        msg = '{} 已全部签到完成.'.format(month)
-        print(msg)
-        logger.info(msg)
+    month_total = user_data.get(f'{month}_total')
+    if month_total is not None and month_total == user_data.get(f"{month}"):
+        output_msg('{} 已全部签到完成.'.format(month))
         return True
     logger.info('检查中...')
     date = user_data.get('date')
     if date is None or date != current_date:
         if printing:
-            logger.info('即将执行签到.')
+            output_msg('即将执行签到.')
         return False
     if printing:
-        msg = '{} 已签到完成.'.format(current_date)
-        logger.info(msg)
-        print(msg)
+        output_msg('{} 已签到完成.'.format(current_date))
     return True
 
 
@@ -446,7 +452,7 @@ def jobs_checker(sc, check_interval):
 def print_next_run_time(job):
     now = datetime.datetime.now()
     if hasattr(job, 'next_run_time'):
-        print(f"预计执行时间：{job.next_run_time} (in {math.ceil(job.next_run_time.timestamp() - now.timestamp())}s)")
+        output_msg(f"预计执行时间：{job.next_run_time} (in {math.ceil(job.next_run_time.timestamp() - now.timestamp())}s)")
     elif hasattr(job, 'trigger'):
         fields = job.trigger.fields
         hours = str(fields[5])
@@ -460,7 +466,7 @@ def print_next_run_time(job):
             _timedelta = datetime.timedelta(
                 hours=_hour - now.hour,
                 minutes=(int(_minutes[0]) if len(_minutes) == 1 else int(_minutes[i])) - now.minute)
-            print(f"预计执行时间：{now + _timedelta} (in {_timedelta.seconds}s)")
+            output_msg(f"预计执行时间：{now + _timedelta} (in {_timedelta.seconds}s)")
             break
 
 
@@ -469,8 +475,7 @@ def set_retrying_copying(conf, value):
 
 
 def shutdown_handler(signum, frame):
-    logger.info(f"👋 收到退出信号 {signal.Signals(signum).name}...")
-    print("退出程序.")
+    output_msg(f"👋 收到退出信号 {signal.Signals(signum).name}.")
     sys.exit(0)
 
 
@@ -489,8 +494,8 @@ def config_logger(config, current_dir):
 def main():
     clear(True)
     current_dir = os.path.dirname(sys.argv[0])
-    print('当前目录为：' + current_dir)
-    print('读取配置文件...')
+    logger.info('当前目录为：' + current_dir)
+    logger.info('读取配置文件...')
     config = get_config(current_dir, logger)
     config.add_section('sys')
     logger.info("添加sys配置项")
@@ -499,7 +504,7 @@ def main():
     config.add_section("local_store")
     logger.info("添加local_store配置项")
     set_retrying_copying(config, config.get('settings', 'retrying'))
-    print(messages[0])
+    logger.info(messages[0])
     mode = config.get('settings', 'execution_mode')
     config_logger(config, current_dir)
     scheduler = BlockingScheduler(option={'logger': logger})
@@ -525,7 +530,7 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        logger.info("👋 程序已退出.")
+        output_msg("👋 程序已退出.")
     except Exception as e:
         logger.error("An unexpected error occurred", exc_info=True)
         sys.exit(1)

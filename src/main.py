@@ -68,7 +68,7 @@ def get_rewards_calendar(cookies, html_data):
     logger.info("获取签到数据.")
     url = "https://www.nutaku.net/rewards-calendar-details/"
     headers = build_headers(0, cookies)
-    resp = requests.get(url, headers=headers)
+    resp = requests.get(url, headers=headers, verify=False)
     logger.debug("headers: {}".format(headers))
     if resp.text.startswith("<!DOCTYPE"):
         logger.info(messages[1])
@@ -136,7 +136,7 @@ def get_nutaku_home(cookies, proxies, config):
 # 签到获取金币
 def get_rewards(cookies, html_data, proxies, config):
     logger.info("请求签到接口.")
-    _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
+    # _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = build_headers(1, cookies)
     headers['X-CSRF-TOKEN'] = html_data.get("csrf_token")
     data = "calendarId={}".format(html_data.get('calendar_id'))

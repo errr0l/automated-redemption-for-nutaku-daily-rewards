@@ -42,6 +42,7 @@ def parse_execution_time(execution_time: str):
 
 # 关闭窗口
 def kill_process():
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
     pid = os.getpid()
     os.kill(pid, signal.SIGTERM)
 

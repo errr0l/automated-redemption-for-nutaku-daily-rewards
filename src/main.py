@@ -141,9 +141,7 @@ def get_rewards(cookies, html_data, proxies, config):
     # _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = build_headers(1, cookies)
     # 有可能是这样的：如果重新登陆的话，原csrf-token会失效，这样的话，登陆后，需要重新获取，否则就需要两次来达成签到
-    home_resp = get_nutaku_home(cookies=cookies, proxies=proxies, config=config)
-    new_html_data = parse_html_for_data(home_resp.text)
-    headers['X-CSRF-TOKEN'] = new_html_data.get("csrf_token")
+    headers['X-CSRF-TOKEN'] = html_data.get("csrf_token")
     headers['x-requested-with'] = 'XMLHttpRequest'
     data = "calendarId={}".format(html_data.get('calendar_id'))
     logger.debug("data->{}".format(data))
@@ -332,6 +330,10 @@ def redeem(config: RawConfigParser, clearing=False, local_store: dict = None, re
                                   csrf_token=html_data.get("csrf_token"))
             if login_cookies is not None:
                 save_json(config, "cookies.json", login_cookies, logger)
+                merged = {**merged, **local_cookies}
+                # 登录后，重新获取csrf-token
+                home_resp = get_nutaku_home(cookies=merged, proxies=proxies, config=config)
+                html_data = parse_html_for_data(home_resp.text)
             else:
                 logger.info("失败，账号&密码错误或" + messages[2] + ", 之后重新运行程序.")
                 kill_process()

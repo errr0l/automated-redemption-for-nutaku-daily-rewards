@@ -2,6 +2,7 @@ import configparser
 import json
 import os
 import signal
+import threading
 import time
 import platform
 
@@ -42,7 +43,10 @@ def parse_execution_time(execution_time: str):
 
 # 关闭窗口
 def kill_process():
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    # signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    if threading.current_thread() is threading.main_thread():
+        # 主线程：可以设置信号处理器
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
     pid = os.getpid()
     os.kill(pid, signal.SIGTERM)
 

@@ -1,0 +1,12 @@
+curl 'https://www.nutaku.net/zh/rewards-calendar/rewards-calendar/redeem/' \
+  -H 'accept: application/json, text/javascript, */*; q=0.01' \
+  -H 'accept-language: zh-CN,zh;q=0.9,en;q=0.8' \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/x-www-form-urlencoded; charset=UTF-8' \
+  -b 'Nutaku_TOKEN=6e974ea273ed858c05279c6ebe3c0378dbf573bb16989b36f1f326ce2b6dbb3f; NUTAKUID=LxFjp5k7Wm9ISrEHWq5Zk094aBc1Qjll0SJXAJnT' \
+  -H 'origin: https://www.nutaku.net' \
+  -H 'referer: https://www.nutaku.net/zh/games/project-qt/' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36' \
+  -H 'x-csrf-token: kWos26VTQNhKQdOEEyNnT4lWhSaU5qR7ks0k1aXf' \
+  -H 'x-requested-with: XMLHttpRequest' \
+  --data-raw 'calendarId=40'

@@ -47,10 +47,12 @@ logger = logging.getLogger("Automated Redemption")
 separator = get_separator()
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+ua11 = get_random_ua()
+
 
 def build_headers(type, cookies):
     headers = {
-        'User-Agent': get_random_ua(),
+        'User-Agent': ua11,
         'Accept': 'application/json, */*',
         'Referer': 'https://www.nutaku.net/games/project-qt/',
         'Host': 'www.nutaku.net',
@@ -138,7 +140,11 @@ def get_rewards(cookies, html_data, proxies, config):
     logger.info("请求签到接口.")
     # _cookie = "NUTAKUID={}; Nutaku_TOKEN={}; isIpad=false"
     headers = build_headers(1, cookies)
-    headers['X-CSRF-TOKEN'] = html_data.get("csrf_token")
+    # 有可能是这样的：如果重新登陆的话，原csrf-token会失效，这样的话，登陆后，需要重新获取，否则就需要两次来达成签到
+    home_resp = get_nutaku_home(cookies=cookies, proxies=proxies, config=config)
+    new_html_data = parse_html_for_data(home_resp.text)
+    headers['X-CSRF-TOKEN'] = new_html_data.get("csrf_token")
+    headers['x-requested-with'] = 'XMLHttpRequest'
     data = "calendarId={}".format(html_data.get('calendar_id'))
     logger.debug("data->{}".format(data))
     logger.debug("headers->{}".format(headers))
@@ -294,9 +300,10 @@ def redeem(config: RawConfigParser, clearing=False, local_store: dict = None, re
     if not check(True, user_data, is_empty):
         local_cookies = {}
         # 如果为已保存邮箱, 使用本地cookie
-        if not is_empty and email in local_store.get("emails", ""):
+        local_cookie_store = load_json(config, "cookies.json", logger)
+        emails = local_cookie_store.get("emails", "")
+        if email in emails:
             logger.info("读取本地cookie.")
-            local_cookie_store = load_json(config, "cookies.json", logger)
             local_cookies = local_cookie_store.get(email, {})
             logger.info(f"[{email}]cookie: {local_cookies}")
         proxies = {}

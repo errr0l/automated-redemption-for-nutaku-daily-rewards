@@ -10,3 +10,47 @@ curl 'https://www.nutaku.net/zh/rewards-calendar/rewards-calendar/redeem/' \
   -H 'x-csrf-token: kWos26VTQNhKQdOEEyNnT4lWhSaU5qR7ks0k1aXf' \
   -H 'x-requested-with: XMLHttpRequest' \
   --data-raw 'calendarId=40'
+
+data->calendarId=40
+2025-12-09 03:24:38,823 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.133 Safari/534.16', 'Accept': 'application/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net',
+'Cookie': 'NUTAKUID=dCIbK6w1aHbCgdS2QRXqySEAQk6wRN3dnhVxZnEf;Nutaku_TOKEN=82bf484a01a599610c844de11d85958be3fed66b7de42b5ede18ef8b9f486a38;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765221869;Nutaku_userLoggedIn=1;
+_m=61916215;LBSERVERID=ded4486;isIpad=false', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-CSRF-TOKEN': 'uRnTQIV2qsdZur0cFEOIcQlnsJMIc0dZVP7IXah8', 'x-requested-with': 'XMLHttpRequest'}
+
+data->calendarId=40
+2025-12-09 03:26:06,536 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.133 Safari/534.16', 'Accept': 'application/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net',
+'Cookie': 'NUTAKUID=dCIbK6w1aHbCgdS2QRXqySEAQk6wRN3dnhVxZnEf;Nutaku_TOKEN=82bf484a01a599610c844de11d85958be3fed66b7de42b5ede18ef8b9f486a38;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765221869;Nutaku_userLoggedIn=1;
+_m=61916215;LBSERVERID=ded4486;isIpad=false', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-CSRF-TOKEN': 'agJjKFvybJ4REZmrL2yphU9xQvdrtJyW4YcOfH1N', 'x-requested-with': 'XMLHttpRequest'}
+
+----
+
+--- 成功请求：
+
+2025-12-10 12:00:31,673 - Automated Redemption - INFO - 获取n站主页.
+2025-12-10 12:00:31,673 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11', 'Accept': 'appl
+ication/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net', 'Cookie': 'NUTAKUID=9WnVf3SHkvVfyFXEzEFlfNnQehNGN7fvNA3EHVBo;Nutaku
+_TOKEN=e3816e465a28c365263b633b036f4cbc382bd4523a1c5e69f48ea7507ea84d56;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765328427;Nutaku_userLoggedIn=1;_m=61916215;LBSER
+VERID=ded4491;isIpad=false'}
+
+2025-12-10 12:00:34,334 - Automated Redemption - INFO - 解析html页面.
+2025-12-10 12:00:34,545 - Automated Redemption - INFO - {'csrf_token': 'Hh6udAwWZPul0ddEZMq3xZJCq9SAdUfqjrrYatWZ', 'url': 'https://www.nutaku.net/rewards-calendar/rewards-calendar/redeem/'}
+
+2025-12-10 12:00:36,440 - Automated Redemption - DEBUG - data->calendarId=40
+2025-12-10 12:00:36,440 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11', 'Accept': 'appl
+ication/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net', 'Cookie': 'NUTAKUID=9WnVf3SHkvVfyFXEzEFlfNnQehNGN7fvNA3EHVBo;Nutaku_TOKEN=e3816e465a28c365263b633b036f4cbc382bd4523a1c5e69f48ea7507ea84d56;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765328427;Nutaku_userLoggedIn=1;_m=61916215;LBSER
+VERID=ded4491;isIpad=false', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-CSRF-TOKEN': 'Hh6udAwWZPul0ddEZMq3xZJCq9SAdUfqjrrYatWZ', 'x-requested-with': 'XMLHttpRequest'}
+
+--- 失败请求：
+
+2025-12-10 09:00:30,870 - Automated Redemption - INFO - 获取n站主页.
+2025-12-10 09:00:30,870 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11', 'Accept': 'appl
+ication/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net', 'Cookie': 'NUTAKUID=dCIbK6w1aHbCgdS2QRXqySEAQk6wRN3dnhVxZnEf;Nutaku
+_TOKEN=82bf484a01a599610c844de11d85958be3fed66b7de42b5ede18ef8b9f486a38;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765221869;Nutaku_userLoggedIn=1;_m=61916215;LBSER
+VERID=ded4486;isIpad=false'}
+
+2025-12-10 09:00:33,096 - Automated Redemption - INFO - 解析html页面.
+2025-12-10 09:00:33,270 - Automated Redemption - INFO - {'csrf_token': 'jsQftplOafe1aMxB95rFAj76H0mWmKfWKqIVSlOf', 'url': 'https://www.nutaku.net/rewards-calendar/rewards-calendar/redeem/'}
+
+2025-12-10 09:00:41,716 - Automated Redemption - DEBUG - data->calendarId=40
+2025-12-10 09:00:41,716 - Automated Redemption - DEBUG - headers->{'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11', 'Accept': 'appl
+ication/json, */*', 'Referer': 'https://www.nutaku.net/games/project-qt/', 'Host': 'www.nutaku.net', 'Origin': 'https://www.nutaku.net', 'Cookie': 'NUTAKUID=9WnVf3SHkvVfyFXEzEFlfNnQehNGN7fvNA3EHVBo;Nutaku_TOKEN=e3816e465a28c365263b633b036f4cbc382bd4523a1c5e69f48ea7507ea84d56;Nutaku_cookiesConsent=1;Nutaku_gamePreferences=%255B%255D;Nutaku_returningVisitor=1765328427;Nutaku_userLoggedIn=1;_m=61916215;LBSER
+VERID=ded4491;isIpad=false', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-CSRF-TOKEN': 'jsQftplOafe1aMxB95rFAj76H0mWmKfWKqIVSlOf', 'x-requested-with': 'XMLHttpRequest'}

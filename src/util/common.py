@@ -92,7 +92,7 @@ def save_json(config: dict, filename: str, data, logger):
             result[key] = data
         else:
             result[key] = {**user_data, **data}
-        logger.debug("user_data: {}".format(user_data))
+        logger.debug("user_data: {}".format(data))
         # 记录邮箱
         emails = result.get("emails", "")
         if key not in emails:

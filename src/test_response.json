@@ -1,0 +1,196 @@
+{
+  "id": 36,
+  "name": {
+    "en": "August Daily Rewards",
+    "es": "Agosto Recompensas diarias",
+    "fr": "Récompenses quotidiennes Août",
+    "de": "August Tägliche Belohnungen",
+    "pl": "Nagrody dzienne za Sierpień",
+    "cn": "八月每日奖励",
+    "zh": "八月每日獎勵",
+    "jp": "8月デイリー報酬"
+  },
+  "validUntil": 1756684799,
+  "promoTime": "",
+  "isAnyCurrentRewardAvailable": false,
+  "rewards": [
+    {
+      "day": 1,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 2,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier4",
+      "slotTitle": "5 Gold"
+    },
+    {
+      "day": 3,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 4,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier4",
+      "slotTitle": "5 Gold"
+    },
+    {
+      "day": 5,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 6,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 7,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 8,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier5",
+      "slotTitle": "10 Gold"
+    },
+    {
+      "day": 9,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 10,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 11,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier5",
+      "slotTitle": "10 Gold"
+    },
+    {
+      "day": 12,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 13,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 14,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "1 Gold"
+    },
+    {
+      "day": 15,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier5",
+      "slotTitle": "10 Gold"
+    },
+    {
+      "day": 16,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 17,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 18,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier5",
+      "slotTitle": "10 Gold"
+    },
+    {
+      "day": 19,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 20,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 21,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 22,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier6",
+      "slotTitle": "15 Gold"
+    },
+    {
+      "day": 23,
+      "status": "claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier3",
+      "slotTitle": "3 Gold"
+    },
+    {
+      "day": 24,
+      "status": "current-not-claimed",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier1",
+      "slotTitle": "2 Gold"
+    },
+    {
+      "day": 25,
+      "status": "future",
+      "benefitType": "gold",
+      "badge": "digital-currency-tier6",
+      "slotTitle": "15 Gold"
+    }
+  ],
+  "areAllRewardClaimed": false,
+  "isRewardClaimed": false,
+  "icon": ""
+}

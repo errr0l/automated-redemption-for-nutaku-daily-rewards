@@ -21,7 +21,7 @@ separator = get_separator()
 
 # 读取配置文件【账号&密码】
 def get_config(config_dir, logger):
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
     config_file_path = config_dir + separator + "config.txt"
     logger.debug("配置文件路径为：" + config_file_path)
     _system = get_platform()
@@ -69,6 +69,7 @@ def load_json(config: dict, filename: str, logger):
         with open(file_path, 'r') as file:
             json_str = file.read()
             if len(json_str) > 0:
+                # decoded_str = json_str.encode('utf-8').decode('unicode_escape')
                 result = json.loads(json_str)
     logger.debug("{}.".format(result))
     return result
